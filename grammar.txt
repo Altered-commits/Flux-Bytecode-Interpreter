@@ -1,0 +1,17 @@
+STATEMENT: Int/Float identifier = EXPRESSION
+         : identifier = EXPRESSION
+         : EXPRESSION
+
+EXPRESSION: TERM (PLUS | MINUS TERM)*
+
+TERM: FACTOR (MULT | DIV FACTOR)*
+
+FACTOR: (+*-* EXPRESSION)*
+      : POWER
+
+POWER: ATOM (^ FACTOR)*
+
+ATOM: identifier
+    : INT, FLOAT
+    : (EXPRESSION)
+    : Cast<Int/Float>(EXPRESSION)
