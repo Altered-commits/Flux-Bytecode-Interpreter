@@ -26,7 +26,8 @@ class Lexer
 
         Token& get_token();
         Token& get_current_token();
-    
+        Token  peek_next_token();
+
     private:
         void advance();
         char peek(std::uint8_t);

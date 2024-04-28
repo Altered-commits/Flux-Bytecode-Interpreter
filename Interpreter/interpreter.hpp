@@ -24,7 +24,7 @@ class ByteCodeInterpreter {
         void handleUnaryArithmetic();
         void handleIntegerArithmetic(ILInstruction);
         void handleFloatingArithmetic(ILInstruction);
-        void handleVariableAssignment();
+        void handleVariableAssignment(ILInstruction);
         void handleVariableAccess();
         void handleCasting(ILInstruction);
     

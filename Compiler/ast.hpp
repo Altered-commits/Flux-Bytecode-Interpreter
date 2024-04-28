@@ -18,15 +18,17 @@ struct ASTCastDummy;
 
 //We will be using the -> Visitor Pattern
 //--------Visitor interface--------
+//The bool is there to tell if something is a sub expression, this is useful for many things such as
+//Multiple variable assignment: so that when something is assigned to variable, it doesnt pop the stack to get value
 class ASTVisitorInterface
 {
     public:
-        virtual void visit(ASTValue& node)          = 0;
-        virtual void visit(ASTBinaryOp& node)       = 0;
-        virtual void visit(ASTUnaryOp& node)        = 0;
-        virtual void visit(ASTVariableAssign& node) = 0;
-        virtual void visit(ASTVariableAccess& node) = 0;
-        virtual void visit(ASTCastDummy& node)      = 0;
+        virtual void visit(ASTValue& node, bool)          = 0;
+        virtual void visit(ASTBinaryOp& node, bool)       = 0;
+        virtual void visit(ASTUnaryOp& node, bool)        = 0;
+        virtual void visit(ASTVariableAssign& node, bool) = 0;
+        virtual void visit(ASTVariableAccess& node, bool) = 0;
+        virtual void visit(ASTCastDummy& node, bool)      = 0;
 };
 
 //AST nodes
@@ -35,7 +37,7 @@ struct ASTNode
     virtual ~ASTNode() = default;
 
     //Visitor
-    virtual void accept(ASTVisitorInterface& visitor) = 0;
+    virtual void accept(ASTVisitorInterface& visitor, bool is_sub_expr) = 0;
 
     //AST Checks
     virtual bool isFloat() const = 0;
@@ -54,8 +56,8 @@ struct ASTValue : public ASTNode
         : type(type), value(value)
     {}
 
-    void accept(ASTVisitorInterface& visitor) override {
-        visitor.visit(*this);
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
     }
 
     bool isFloat() const override {
@@ -80,8 +82,8 @@ struct ASTBinaryOp : public ASTNode
         : op_type(op_type), left(std::move(left)), right(std::move(right))
     {}
 
-    void accept(ASTVisitorInterface& visitor) override {
-        visitor.visit(*this);
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
     }
 
     bool isFloat() const override {
@@ -111,8 +113,8 @@ struct ASTUnaryOp : public ASTNode
         : op_type(op_type), expr(std::move(expr))
     {}
 
-    void accept(ASTVisitorInterface& visitor) override {
-        visitor.visit(*this);
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
     }
 
     bool isFloat() const override {
@@ -138,8 +140,8 @@ struct ASTVariableAssign : public ASTNode
         : identifier(identifier), var_type(type), expr(std::move(expr)), should_return_value(srv)
     {}
 
-    void accept(ASTVisitorInterface& visitor) override {
-        visitor.visit(*this);
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
     }
 
     bool isFloat() const override {
@@ -163,8 +165,8 @@ struct ASTVariableAccess : public ASTNode
         : identifier(identifier), var_type(type)
     {}
 
-    void accept(ASTVisitorInterface& visitor) override {
-        visitor.visit(*this);
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
     }
 
     bool isFloat() const override {
@@ -188,8 +190,8 @@ struct ASTCastDummy : public ASTNode
         : eval_type(eval_type), eval_expr(std::move(expr))
     {}
 
-    void accept(ASTVisitorInterface& visitor) override {
-        visitor.visit(*this);
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
     }
 
     bool isFloat() const override {

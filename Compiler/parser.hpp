@@ -39,11 +39,12 @@ class Parser
 
     private:
         void advance();
+        Token peek();
         bool match_types(TokenType);
 
     private:
-        Lexer lex;
-        Token& current_token;
+        Lexer         lex;
+        Token&        current_token;
 
         std::vector<ASTPtr> statements;
         //Temporary symbol table for variables

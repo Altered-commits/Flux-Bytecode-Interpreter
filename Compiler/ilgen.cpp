@@ -6,7 +6,8 @@ std::vector<ILCommand>& ILGenerator::generateIL()
     {
         for (auto &&ast : ast_statements)
         {
-            ast->accept(*this);
+            //Initially, subexpression will be false
+            ast->accept(*this, false);
         }
 
         //Manually add END_OF_FILE
@@ -18,7 +19,7 @@ std::vector<ILCommand>& ILGenerator::generateIL()
     std::exit(1);
 }
 
-void ILGenerator::visit(ASTValue& value_node)
+void ILGenerator::visit(ASTValue& value_node, bool)
 {
     ILInstruction inst_type;
         // For constant values, push them onto the stack
@@ -39,11 +40,11 @@ void ILGenerator::visit(ASTValue& value_node)
         il_code.emplace_back(inst_type, value_node.value);
 }
 
-void ILGenerator::visit(ASTBinaryOp& binary_op_node)
+void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool is_sub_expr)
 {
     // For binary operations, recursively generate IL for left and right operands
-    binary_op_node.left->accept(*this);
-    binary_op_node.right->accept(*this);
+    binary_op_node.left->accept(*this, true);
+    binary_op_node.right->accept(*this, true);
 
     // Determine if the operation involves floating-point arithmetic
     // If either side is a float type, or if the expression contains power operator, we use float operations
@@ -78,9 +79,9 @@ void ILGenerator::visit(ASTBinaryOp& binary_op_node)
             break;
     }
 }
-void ILGenerator::visit(ASTUnaryOp& unary_op_node)
+void ILGenerator::visit(ASTUnaryOp& unary_op_node, bool is_sub_expr)
 {
-    unary_op_node.expr->accept(*this);
+    unary_op_node.expr->accept(*this, true);
 
     switch (unary_op_node.op_type)
     {
@@ -97,24 +98,37 @@ void ILGenerator::visit(ASTUnaryOp& unary_op_node)
     }
 }
 
-//To be implemented in near future
-void ILGenerator::visit(ASTVariableAssign& var_assign_node)
+//Variable assignment: a = 10 or Float a = 10.0; etc etc
+void ILGenerator::visit(ASTVariableAssign& var_assign_node, bool is_sub_expr)
 {
-    var_assign_node.expr->accept(*this);
+    var_assign_node.expr->accept(*this, true);
+
+    ILInstruction inst;
     
-    std::cout << "ASSIGN_VAR " << var_assign_node.identifier << '\n';
-    //This is actually simple ngl, due to usage of variant
-    il_code.emplace_back(ILInstruction::ASSIGN_VAR, var_assign_node.identifier);
+    switch (is_sub_expr)
+    {
+        case true:
+            std::cout << "ASSIGN_VAR_NO_POP " << var_assign_node.identifier << '\n';
+            inst = ILInstruction::ASSIGN_VAR_NO_POP;
+            break;
+        case false:
+            std::cout << "ASSIGN_VAR " << var_assign_node.identifier << '\n';
+            inst = ILInstruction::ASSIGN_VAR;
+            break;
+    }
+    //Depending on whether the variable is a sub expression, we either pop and assign value,
+    //or we assign value and not pop the stack
+    il_code.emplace_back(inst, var_assign_node.identifier);
 }
-void ILGenerator::visit(ASTVariableAccess& var_access_node)
+void ILGenerator::visit(ASTVariableAccess& var_access_node, bool is_sub_expr)
 {
     std::cout << "ACCESS_VAR " << var_access_node.identifier << '\n';
     il_code.emplace_back(ILInstruction::ACCESS_VAR, var_access_node.identifier);
 }
 
-void ILGenerator::visit(ASTCastDummy& expr)
+void ILGenerator::visit(ASTCastDummy& expr, bool is_sub_expr)
 {
-    expr.eval_expr->accept(*this);
+    expr.eval_expr->accept(*this, true);
 
     switch (expr.eval_type)
     {

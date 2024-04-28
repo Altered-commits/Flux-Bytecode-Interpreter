@@ -32,17 +32,7 @@ ASTPtr Parser::parse_statement()
         
         return parse_variable(var_type, false);
     }
-    //When we want identifier = expr;
-    if(match_types(TOKEN_ID))
-    {
-        auto elem = temporary_symbol_table.find(current_token.token_value);
-        if(elem == temporary_symbol_table.end())
-        {
-            std::cout << "[ParserError]: Undefined variable: " << current_token.token_value << '\n';
-            std::exit(1);
-        }
-        return parse_variable(elem->second, true);
-    }
+
     return parse_expr();
 }
 
@@ -119,9 +109,23 @@ ASTPtr Parser::common_binary_op(
     return left;
 }
 
-//Plus/Minus operation for two numbers
+//Plus/Minus operation for two numbers, variable re-assignment
 ASTPtr Parser::parse_expr()
 {
+    //When we want identifier = expr; re-assigning variables
+    if(match_types(TOKEN_ID))
+    {
+        if(peek().token_type == TOKEN_EQ)
+        {
+            auto elem = temporary_symbol_table.find(current_token.token_value);
+            if(elem == temporary_symbol_table.end())
+            {
+                std::cout << "[ParserError]: Undefined variable: " << current_token.token_value << '\n';
+                std::exit(1);
+            }
+            return parse_variable(elem->second, true);
+        }
+    }
     return common_binary_op(std::bind(&parse_term, this), TOKEN_PLUS, TOKEN_MINUS);
 }
 
@@ -194,7 +198,7 @@ ASTPtr Parser::parse_atom()
 
             if(!match_types(TOKEN_RPAREN))
             {
-                std::cerr << "[ParserError]: Expected ')'\n";
+                std::cout << "[ParserError]: Expected ')'\n";
                 std::exit(1);
             }
 
@@ -219,7 +223,7 @@ ASTPtr Parser::parse_cast()
     //Look for '<'
     if(!match_types(TOKEN_LT))
     {
-        std::cout << "[ParserError]: Expected '<'.\n";
+        std::cout << "[ParserError]: 'Cast' Expected '<'.\n";
         std::exit(1);
     }
     advance();
@@ -227,7 +231,7 @@ ASTPtr Parser::parse_cast()
     //Get a type: Int, Float, etc
     if((!match_types(TOKEN_KEYWORD_INT)) && (!match_types(TOKEN_KEYWORD_FLOAT)))
     {
-        std::cout << "[ParserError]: Expected a type for 'Cast' keyword: like Int, Float, etc.\n";
+        std::cout << "[ParserError]: 'Cast' Expected a type after '<': like Int, Float, etc.\n";
         std::exit(1);
     }
     TokenType eval_type = current_token.token_type;
@@ -236,7 +240,7 @@ ASTPtr Parser::parse_cast()
     //Look for '>'
     if(!match_types(TOKEN_GT))
     {
-        std::cout << "[ParserError]: Expected '>'.\n";
+        std::cout << "[ParserError]: 'Cast' Expected '>'.\n";
         std::exit(1);
     }
     advance();
@@ -244,7 +248,7 @@ ASTPtr Parser::parse_cast()
     //look for '(' before parsing expr
     if(!match_types(TOKEN_LPAREN))
     {
-        std::cout << "[ParserError]: Expected '('.\n";
+        std::cout << "[ParserError]: 'Cast' Expected '('.\n";
         std::exit(1);
     }
     advance();
@@ -254,7 +258,7 @@ ASTPtr Parser::parse_cast()
     //look for ')'
     if(!match_types(TOKEN_RPAREN))
     {
-        std::cout << "[ParserError]: Expected ')'.\n";
+        std::cout << "[ParserError]: 'Cast' Expected ')'.\n";
         std::exit(1);
     }
     advance();
@@ -298,6 +302,11 @@ ASTPtr Parser::create_cast_dummy_node(TokenType eval_type, ASTPtr&& expr)
 void Parser::advance()
 {
     current_token = lex.get_token();
+}
+
+Token Parser::peek()
+{
+    return lex.peek_next_token();
 }
 
 //can be used for error handling later

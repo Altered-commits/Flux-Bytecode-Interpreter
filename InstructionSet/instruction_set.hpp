@@ -23,6 +23,7 @@ enum ILInstruction : std::uint8_t
     POW,
     //Variable instructions
     ASSIGN_VAR,
+    ASSIGN_VAR_NO_POP,
     ACCESS_VAR,
     //Casting instruction
     CAST_INT,

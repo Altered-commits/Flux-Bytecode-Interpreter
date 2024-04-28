@@ -29,12 +29,12 @@ class ILGenerator : public ASTVisitorInterface {
         std::vector<ILCommand>& generateIL();
 
     private:
-        void visit(ASTValue&);
-        void visit(ASTBinaryOp&);
-        void visit(ASTUnaryOp&);
-        void visit(ASTVariableAssign&);
-        void visit(ASTVariableAccess&);
-        void visit(ASTCastDummy&);
+        void visit(ASTValue&, bool);
+        void visit(ASTBinaryOp&, bool);
+        void visit(ASTUnaryOp&, bool);
+        void visit(ASTVariableAssign&, bool);
+        void visit(ASTVariableAccess&, bool);
+        void visit(ASTCastDummy&, bool);
 
     private:
         std::vector<ASTPtr>    ast_statements;

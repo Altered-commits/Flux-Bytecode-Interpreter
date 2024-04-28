@@ -144,6 +144,26 @@ Token& Lexer::get_current_token()
     return token;
 }
 
+Token Lexer::peek_next_token()
+{
+    //Save lexer state
+    Token saved_token = token;
+    std::uint64_t saved_pos = cur_pos;
+    char saved_char = cur_chr;
+    
+    //Lex
+    lex();
+    Token next = token;
+    
+    //Rewind lexer state
+    token = saved_token;
+    cur_pos = saved_pos;
+    cur_chr = saved_char;
+    
+    //Return
+    return next;
+}
+
 void Lexer::set_token(const std::string& token_text, TokenType token_type)
 {
     token.token_type  = token_type;

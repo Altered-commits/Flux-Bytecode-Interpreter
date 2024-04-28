@@ -29,6 +29,7 @@ void FileWriter::writeToFile(const std::vector<ILCommand> &commands)
             //The actual instruction is already written, i just need to write the variable to the file
             case ACCESS_VAR:
             case ASSIGN_VAR:
+            case ASSIGN_VAR_NO_POP:
                 writeStringToFile(cmd.operand);
                 break;
         }

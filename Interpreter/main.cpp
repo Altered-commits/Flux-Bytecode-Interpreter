@@ -13,7 +13,6 @@ int main(int argc, char** argv)
     }
 
     auto start = std::chrono::high_resolution_clock::now();
-    std::cout << "Interpreting:\n\n";
 
     ByteCodeInterpreter bct{argv[1]};
     bct.readFromFile();

@@ -95,14 +95,17 @@ void ByteCodeInterpreter::handleUnaryArithmetic()
     }, globalStack.top());
 }
 
-void ByteCodeInterpreter::handleVariableAssignment()
+void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst)
 {
     //After the instruction, read the variable and push it to global symbol table
     std::string& identifier = readStringFromFile();
     
     //But before pushing it to symbol table, pop the stack to get evaluated expression
     auto elem = globalStack.top();
-    globalStack.pop();
+
+    //Depending on the instruction, we either pop or dont pop
+    if(inst != ASSIGN_VAR_NO_POP)
+        globalStack.pop();
 
     // and assign it to variable :D
     globalSymbolTable[identifier] = elem;
@@ -184,7 +187,8 @@ void ByteCodeInterpreter::readFromFile()
                 break;
             
             case ILInstruction::ASSIGN_VAR:
-                handleVariableAssignment();
+            case ILInstruction::ASSIGN_VAR_NO_POP:
+                handleVariableAssignment(inst);
                 break;
             
             case ILInstruction::ACCESS_VAR:
