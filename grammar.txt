@@ -1,8 +1,8 @@
 STATEMENT: Int/Float identifier = EXPRESSION
-         : identifier = EXPRESSION
          : EXPRESSION
 
 EXPRESSION: TERM (PLUS | MINUS TERM)*
+          : identifier = EXPRESSION
 
 TERM: FACTOR (MULT | DIV FACTOR)*
 
