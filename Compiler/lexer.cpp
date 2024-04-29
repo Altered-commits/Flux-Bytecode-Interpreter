@@ -1,8 +1,17 @@
 #include <iostream>
 #include "lexer.hpp"
 
+//Global stuff ig
+std::size_t Lexer::line = 0;
+std::size_t Lexer::col = 0;
+
 void Lexer::advance()
 {
+    if(cur_chr == '\n') {
+        ++line; col = 0;
+    }
+    else
+        ++col;
     cur_chr = text[++cur_pos];
 }
 
@@ -30,10 +39,7 @@ void Lexer::lex_digits()
             dot_count += 1;
         
         if(dot_count > 1)
-        {
-            std::cout << "[LexerError]: Multiple '.' found while tokenizing float!";
-            std::exit(1);
-        }
+            printError("LexerError", "Floating number can only have at max one '.', multiple '.' found");
 
         temp += cur_chr;
         
@@ -127,12 +133,11 @@ void Lexer::lex()
             set_token("EOF", TOKEN_EOF);
             return;
         default:
-            std::cout << "[LexerError]: Character not supported: " << (int)cur_chr << '\n';
-            std::exit(1);
+            printError("LexerError", "Character not supported, Character: ", cur_chr);
     }
 
 }
-
+//------------------------------------------
 Token& Lexer::get_token()
 {
     lex();
@@ -168,4 +173,9 @@ void Lexer::set_token(const std::string& token_text, TokenType token_type)
 {
     token.token_type  = token_type;
     token.token_value = token_text;
+}
+
+std::pair<std::size_t, std::size_t> Lexer::getLineColCount()
+{
+    return {line, col};
 }

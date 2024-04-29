@@ -9,10 +9,8 @@ std::vector<ASTPtr>& Parser::parse()
         
         //In case where the input is like: 50 50 instead of: 50 + 50, uk its an error
         if(lex.get_current_token().token_type != TOKEN_SEMIC)
-        {
-            std::cout << "[ParserError]: Expected tokens: '+', '-', '*','/' or end the statement with a ';'\n";
-            std::exit(1);
-        }
+            printError("ParserError", "Expected tokens: '+', '-', '*','/' or end the statement with a ';'");
+    
         advance();
         
         statements.push_back(std::move(res));
@@ -40,26 +38,19 @@ ASTPtr Parser::parse_variable(TokenType var_type, bool is_reassignment)
 {
     //Grab the identifier
     if(!match_types(TOKEN_ID))
-    {
-        std::cout << "[ParserError]: Expected identifer after type.\n";
-        std::exit(1);
-    }
+        printError("ParserError", "Expected identifier after type");
 
     //Variable name should not clash with the existing names
     std::string identifier = current_token.token_value;
     if((temporary_symbol_table.find(identifier) != temporary_symbol_table.end()) && (!is_reassignment))
-    {
-        std::cout << "[ParserError]: Variable name already exists, use another one.\n";
-        std::exit(1);
-    }
+        printError("ParserError", "Current variable: ", identifier, " already exists, use another name");
+
     advance();
 
     //Check for Equals symbol
     if(!match_types(TOKEN_EQ))
-    {
-        std::cout << "[ParserError]: Expected '=' token after identifier.\n";
-        std::exit(1);
-    }
+        printError("ParserError", "Expected '=' after identifier");
+
     advance();
 
     //The value of variable, the expression
@@ -75,11 +66,7 @@ ASTPtr Parser::parse_variable(TokenType var_type, bool is_reassignment)
         return create_variable_assign_node(var_type, identifier, std::move(var_expr));
     }
     //Oops, types dont match, errrorrrrr!
-    else
-    {
-        std::cout << "[ParserError]: Evaluated expression type doesn't match the type specified to variable.\n";
-        std::exit(1);
-    }
+    printError("ParserError", "Evaluated expression type doesn't match the type specified to variable.");    
 }
 
 //common binary operations such as addition, subtraction etc
@@ -119,10 +106,8 @@ ASTPtr Parser::parse_expr()
         {
             auto elem = temporary_symbol_table.find(current_token.token_value);
             if(elem == temporary_symbol_table.end())
-            {
-                std::cout << "[ParserError]: Undefined variable: " << current_token.token_value << '\n';
-                std::exit(1);
-            }
+                printError("ParserError", "Undefined variable: ", current_token.token_value);
+
             return parse_variable(elem->second, true);
         }
     }
@@ -177,10 +162,7 @@ ASTPtr Parser::parse_atom()
                 return create_variable_access_node(elem->second, elem->first);
             }
             else
-            {
-                std::cout << "[ParserError]: Undefined variable: " << current_token.token_value << '\n';
-                std::exit(1);
-            }
+                printError("ParserError", "Undefined variable: ", current_token.token_value);
         }
         //Values
         case TOKEN_INT:
@@ -197,10 +179,7 @@ ASTPtr Parser::parse_atom()
             auto expr = parse_expr();
 
             if(!match_types(TOKEN_RPAREN))
-            {
-                std::cout << "[ParserError]: Expected ')'\n";
-                std::exit(1);
-            }
+                printError("ParserError", "Expected ')'");
 
             advance();
             return expr;
@@ -210,10 +189,7 @@ ASTPtr Parser::parse_atom()
             return parse_cast();
         //Welp
         default:
-        {
-            std::cout << "[ParserError]: Expected some sort of Integer or Float / Unary expression.\n";
-            std::exit(1);
-        }
+            printError("ParserError", "Expected some sort of Integer or Float / Unary expression");
     }
 }
 
@@ -222,45 +198,35 @@ ASTPtr Parser::parse_cast()
     advance();
     //Look for '<'
     if(!match_types(TOKEN_LT))
-    {
-        std::cout << "[ParserError]: 'Cast' Expected '<'.\n";
-        std::exit(1);
-    }
+        printError("ParserError", "'Cast' Expected '<'");
+        
     advance();
     
     //Get a type: Int, Float, etc
     if((!match_types(TOKEN_KEYWORD_INT)) && (!match_types(TOKEN_KEYWORD_FLOAT)))
-    {
-        std::cout << "[ParserError]: 'Cast' Expected a type after '<': like Int, Float, etc.\n";
-        std::exit(1);
-    }
+        printError("ParserError", "'Cast' Expected a type after '<': like Int, Float, etc");
+    
     TokenType eval_type = current_token.token_type;
     advance();
 
     //Look for '>'
     if(!match_types(TOKEN_GT))
-    {
-        std::cout << "[ParserError]: 'Cast' Expected '>'.\n";
-        std::exit(1);
-    }
+        printError("ParserError", "'Cast' Expected '>'");
+
     advance();
 
     //look for '(' before parsing expr
     if(!match_types(TOKEN_LPAREN))
-    {
-        std::cout << "[ParserError]: 'Cast' Expected '('.\n";
-        std::exit(1);
-    }
+        printError("ParserError", "'Cast' Expected '('");
+
     advance();
 
     auto expr = parse_expr();
 
     //look for ')'
     if(!match_types(TOKEN_RPAREN))
-    {
-        std::cout << "[ParserError]: 'Cast' Expected ')'.\n";
-        std::exit(1);
-    }
+        printError("ParserError", "'Cast' Expected ')'");
+
     advance();
 
     //construct and return the dummy ast node

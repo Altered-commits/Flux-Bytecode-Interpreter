@@ -27,6 +27,7 @@ class Lexer
         Token& get_token();
         Token& get_current_token();
         Token  peek_next_token();
+        static std::pair<std::size_t, std::size_t> getLineColCount();
 
     private:
         void advance();
@@ -49,6 +50,10 @@ class Lexer
         Token         token;
     
     private:
+        static std::size_t col;
+        static std::size_t line;
+    
+    private:
         //For Differentiation of keyword and identifier
         const std::map<std::string, TokenType> identifier_map = {
             {"Int", TOKEN_KEYWORD_INT},
@@ -57,5 +62,8 @@ class Lexer
         };
 
 };
+
+//SO THAT THIS DOESNT GIVE ERROR OF INCOMPLETE TYPE
+#include "error_printer.hpp"
 
 #endif

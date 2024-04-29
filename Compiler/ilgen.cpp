@@ -74,9 +74,7 @@ void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool is_sub_expr)
             il_code.emplace_back(ILInstruction::POW);
             break;
         default:
-            std::cerr << "[ILError]: Unsupported binary operation, operation type: " << binary_op_node.op_type << '\n';
-            std::exit(1);
-            break;
+            printError("Unsupported Binary Operation. Operation type: ", binary_op_node.op_type);
     }
 }
 void ILGenerator::visit(ASTUnaryOp& unary_op_node, bool is_sub_expr)
@@ -92,9 +90,7 @@ void ILGenerator::visit(ASTUnaryOp& unary_op_node, bool is_sub_expr)
             il_code.emplace_back(ILInstruction::NEG);
             break;
         default:
-            std::cerr << "Unsupported unary operation, operation type: " << unary_op_node.op_type << '\n';
-            std::exit(1);
-            break;
+            printError("Unsupported Unary Operation. Operation type: ", unary_op_node.op_type);
     }
 }
 

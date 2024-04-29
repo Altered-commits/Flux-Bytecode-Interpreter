@@ -8,6 +8,7 @@
 #include <cmath>
 
 #include "ast.hpp"
+#include "error_printer.hpp"
 #include "..\InstructionSet\instruction_set.hpp"
   
 struct ILCommand
