@@ -8,6 +8,17 @@
 struct ASTNode;
 using  ASTPtr = std::unique_ptr<ASTNode>;
 
+//BTW, this may look useless right now but trust me its important for same precedence operators
+constexpr size_t comparisionTypeMask = (1ULL << static_cast<std::size_t>(TOKEN_EEQ))
+                                    | (1ULL << static_cast<std::size_t>(TOKEN_NEQ))
+                                    | (1ULL << static_cast<std::size_t>(TOKEN_GT))
+                                    | (1ULL << static_cast<std::size_t>(TOKEN_LT))
+                                    | (1ULL << static_cast<std::size_t>(TOKEN_GTEQ))
+                                    | (1ULL << static_cast<std::size_t>(TOKEN_LTEQ));
+
+//Used for comparing token type in a type mask
+#define SAME_PRECEDENCE_MASK_CHECK(token, mask) (((1ULL << static_cast<std::size_t>(token)) & mask) != 0)
+
 //For the visitor pattern, we need to forward declare all the nodes, here we go
 struct ASTValue;
 struct ASTBinaryOp;
@@ -96,6 +107,9 @@ struct ASTBinaryOp : public ASTNode
     TokenType evaluateExprType() const override {
         if(op_type == TOKEN_POW)
             return TOKEN_FLOAT;
+        
+        if(SAME_PRECEDENCE_MASK_CHECK(op_type, comparisionTypeMask))
+            return TOKEN_INT;
         
         if(left->evaluateExprType() == TOKEN_FLOAT || right->evaluateExprType() == TOKEN_FLOAT)
             return TOKEN_FLOAT;

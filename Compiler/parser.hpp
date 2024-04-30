@@ -21,13 +21,18 @@ class Parser
     private:
         ASTPtr parse_statement();
         ASTPtr parse_expr();
+        ASTPtr parse_comp_expr();
+        ASTPtr parse_arith_expr();
         ASTPtr parse_term();
         ASTPtr parse_factor();
         ASTPtr parse_power();
         ASTPtr parse_atom();
-        ASTPtr parse_variable(TokenType, bool);
+    
+    private:
         ASTPtr parse_cast();
+        ASTPtr parse_variable(TokenType, bool);
         ASTPtr common_binary_op(ParseFuncPtr, TokenType, TokenType, ParseFuncPtr);
+        ASTPtr common_binary_op(ParseFuncPtr, std::size_t, ParseFuncPtr);
     
     private:
         ASTPtr create_value_node(const Token&);

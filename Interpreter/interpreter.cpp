@@ -1,5 +1,4 @@
 #include <stack>
-#include <variant>
 #include <map>
 
 #include "interpreter.hpp"
@@ -7,10 +6,10 @@
 //Instruction Operand 
 
 //Global Stack
-std::stack<std::variant<int, float>> globalStack;
+std::stack<ValueType> globalStack;
 
 //Global symbol table
-std::map<std::string, std::variant<int, float>> globalSymbolTable;
+std::map<std::string, ValueType> globalSymbolTable;
 
 void ByteCodeInterpreter::handleIntegerArithmetic(ILInstruction inst)
 {
@@ -130,6 +129,29 @@ void ByteCodeInterpreter::handleCasting(ILInstruction inst)
     }, globalStack.top());
 }
 
+void ByteCodeInterpreter::handleComparisionAndLogical(ILInstruction inst)
+{
+    auto elem1 = globalStack.top();
+    globalStack.pop();
+    switch (inst)
+    {
+        case NOT:
+            std::visit([&](auto&& arg1){
+                compare(arg1, 0, inst);
+            }, elem1);
+            break;
+        //Rest of the comparision / logical stuff
+        default:
+            auto elem2 = globalStack.top();
+            globalStack.pop();
+
+            std::visit([&](auto&& arg1, auto&& arg2){
+                compare(arg1, arg2, inst);
+            }, elem1, elem2);
+            break;
+    }
+}
+
 void ByteCodeInterpreter::readFromFile()
 {
     bool shouldRead = true;
@@ -186,6 +208,21 @@ void ByteCodeInterpreter::readFromFile()
                 handleFloatingArithmetic(inst);
                 break;
             
+            //Comparision Operations
+            case ILInstruction::CMP_EQ:
+            case ILInstruction::CMP_NEQ:
+            case ILInstruction::CMP_LT:
+            case ILInstruction::CMP_GT:
+            case ILInstruction::CMP_LTEQ:
+            case ILInstruction::CMP_GTEQ:
+            //Logical Operations, NOT handled seperately
+            case ILInstruction::AND:
+            case ILInstruction::OR:
+            case ILInstruction::NOT:
+                handleComparisionAndLogical(inst);
+                break;
+
+            //Assignment
             case ILInstruction::ASSIGN_VAR:
             case ILInstruction::ASSIGN_VAR_NO_POP:
                 handleVariableAssignment(inst);
@@ -218,4 +255,43 @@ std::string& ByteCodeInterpreter::readStringFromFile()
     inFile.read(&currentVariable[0], length);
 
     return currentVariable;
+}
+
+template<typename T, typename U>
+void ByteCodeInterpreter::compare(const T& arg1, const U& arg2, ILInstruction inst)
+{
+    int result;
+    switch (inst) {
+        //Comparision operators
+        case ILInstruction::CMP_EQ:
+            result = (arg1 == arg2);
+            break;
+        case ILInstruction::CMP_NEQ:
+            result = (arg1 != arg2);
+            break;
+        case ILInstruction::CMP_LT:
+            result = (arg1 < arg2);
+            break;
+        case ILInstruction::CMP_GT:
+            result = (arg1 > arg2);
+            break;
+        case ILInstruction::CMP_LTEQ:
+            result = (arg1 <= arg2);
+            break;
+        case ILInstruction::CMP_GTEQ:
+            result = (arg1 >= arg2);
+            break;
+        //Logical operations
+        case ILInstruction::ADD:
+            result = (arg1 && arg2);
+            break;
+        case ILInstruction::OR:
+            result = (arg1 || arg2);
+            break;
+        //For not, we only have arg1
+        case ILInstruction::NOT:
+            result = !arg1;
+            break;
+    }
+    globalStack.push(result);
 }

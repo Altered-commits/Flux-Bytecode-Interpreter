@@ -37,6 +37,7 @@ class Lexer
         void skip_spaces();
         void lex_digits();
         void lex_identifier_or_keyword();
+        void lex_this_or_eq_variation(const char*, const char*, TokenType, TokenType);
 
         void lex();
 

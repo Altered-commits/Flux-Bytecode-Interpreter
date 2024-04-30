@@ -31,7 +31,7 @@ static void printError(std::string errorSection, const std::string& errorMsg, Ar
     std::exit(1);
 }
 
-//For ILGen errors specifically
+//For ILGen errors specifically, normally there shouldnt be a single error in this
 static void printError(std::string errorMsg, TokenType operandType)
 {
     std::cout << "[ILGeneratorError]: " << errorMsg << operandType << '\n';

@@ -28,6 +28,17 @@ enum ILInstruction : std::uint8_t
     //Casting instruction
     CAST_INT,
     CAST_FLOAT,
+    //Comparision instructions
+    CMP_EQ,
+    CMP_NEQ,
+    CMP_GT,
+    CMP_LT,
+    CMP_GTEQ,
+    CMP_LTEQ,
+    //Logical operations
+    AND,
+    OR,
+    NOT,
     //EOF
     END_OF_FILE
 };

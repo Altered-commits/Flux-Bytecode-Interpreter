@@ -73,6 +73,38 @@ void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool is_sub_expr)
             std::cout << "POW\n";
             il_code.emplace_back(ILInstruction::POW);
             break;
+        case TOKEN_EEQ:
+            std::cout << "CMP_EQ\n";
+            il_code.emplace_back(ILInstruction::CMP_EQ);
+            break;
+        case TOKEN_NEQ:
+            std::cout << "CMP_NEQ\n";
+            il_code.emplace_back(ILInstruction::CMP_NEQ);
+            break;
+        case TOKEN_GT:
+            std::cout << "CMP_GT\n";
+            il_code.emplace_back(ILInstruction::CMP_GT);
+            break;
+        case TOKEN_LT:
+            std::cout << "CMP_LT\n";
+            il_code.emplace_back(ILInstruction::CMP_LT);
+            break;
+        case TOKEN_GTEQ:
+            std::cout << "CMP_GTEQ\n";
+            il_code.emplace_back(ILInstruction::CMP_GTEQ);
+            break;
+        case TOKEN_LTEQ:
+            std::cout << "CMP_LTEQ\n";
+            il_code.emplace_back(ILInstruction::CMP_LTEQ);
+            break;
+        case TOKEN_AND:
+            std::cout << "AND\n";
+            il_code.emplace_back(ILInstruction::AND);
+            break;
+        case TOKEN_OR:
+            std::cout << "OR\n";
+            il_code.emplace_back(ILInstruction::OR);
+            break;
         default:
             printError("Unsupported Binary Operation. Operation type: ", binary_op_node.op_type);
     }
@@ -88,6 +120,10 @@ void ILGenerator::visit(ASTUnaryOp& unary_op_node, bool is_sub_expr)
         case TOKEN_MINUS:
             std::cout << "NEG\n";
             il_code.emplace_back(ILInstruction::NEG);
+            break;
+        case TOKEN_NOT:
+            std::cout << "NOT\n";
+            il_code.emplace_back(ILInstruction::NOT);
             break;
         default:
             printError("Unsupported Unary Operation. Operation type: ", unary_op_node.op_type);

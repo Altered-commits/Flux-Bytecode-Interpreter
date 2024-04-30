@@ -14,6 +14,9 @@ enum TokenType {
     //<> Type
     TOKEN_LT,
     TOKEN_GT,
+    //<=, >= Type
+    TOKEN_LTEQ,
+    TOKEN_GTEQ,
     //Arithmetic Types
     TOKEN_PLUS,
     TOKEN_MINUS,
@@ -22,6 +25,13 @@ enum TokenType {
     TOKEN_POW,
     //Assignment Type
     TOKEN_EQ,
+    //==, != Type
+    TOKEN_EEQ,
+    TOKEN_NEQ,
+    //&&, !, || Type
+    TOKEN_AND,
+    TOKEN_NOT,
+    TOKEN_OR,
     //Keyword and Identifier Types
     TOKEN_ID,
     TOKEN_KEYWORD_INT,

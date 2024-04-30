@@ -19,19 +19,53 @@ std::vector<ASTPtr>& Parser::parse()
     return statements;
 }
 
-ASTPtr Parser::parse_statement()
+//-----------------TECHNICALLY Helper Functions-----------------
+ASTPtr Parser::parse_cast()
 {
-    //Variable declaration, float/int identifier = expr;
-    if(match_types(TOKEN_KEYWORD_FLOAT) || match_types(TOKEN_KEYWORD_INT))
-    {
-        //Grab the token type, the type of variable.
-        TokenType var_type = current_token.token_type;
-        advance();
+    advance();
+    //Look for '<'
+    if(!match_types(TOKEN_LT))
+        printError("ParserError", "'Cast' Expected '<'");
         
-        return parse_variable(var_type, false);
+    advance();
+    
+    //Look for a type 
+    switch (current_token.token_type)
+    {
+        //Perfect
+        case TOKEN_KEYWORD_INT:
+        case TOKEN_KEYWORD_FLOAT:
+            break;
+   
+        default:
+            printError("ParserError", "'Cast' Expected a type after '<', like Int, Float, Etc");
     }
+    
+    TokenType eval_type = current_token.token_type;
+    advance();
 
-    return parse_expr();
+    //Look for '>'
+    if(!match_types(TOKEN_GT))
+        printError("ParserError", "'Cast' Expected '>'");
+
+    advance();
+
+    //look for '(' before parsing expr
+    if(!match_types(TOKEN_LPAREN))
+        printError("ParserError", "'Cast' Expected '('");
+
+    advance();
+
+    auto expr = parse_expr();
+
+    //look for ')'
+    if(!match_types(TOKEN_RPAREN))
+        printError("ParserError", "'Cast' Expected ')'");
+
+    advance();
+
+    //construct and return the dummy ast node
+    return create_cast_dummy_node(eval_type, std::move(expr));
 }
 
 ASTPtr Parser::parse_variable(TokenType var_type, bool is_reassignment)
@@ -96,6 +130,47 @@ ASTPtr Parser::common_binary_op(
     return left;
 }
 
+//Overload of common_binary_op for multiple params
+ASTPtr Parser::common_binary_op(
+    ParseFuncPtr callback_left,
+    std::size_t mask,
+    ParseFuncPtr callback_right = nullptr)
+{
+    if(callback_right == nullptr)
+        callback_right = callback_left;
+    
+    auto left = callback_left();
+
+    while(SAME_PRECEDENCE_MASK_CHECK(current_token.token_type, mask))
+    {
+        //save the current operator type
+        TokenType op = current_token.token_type;
+        advance();
+
+        auto right = callback_right();
+        
+        left = create_binary_op_node(op, std::move(left), std::move(right));
+    }
+
+    return left;
+}
+
+//-----------------START OF PARSING-----------------
+ASTPtr Parser::parse_statement()
+{
+    //Variable declaration, float/int identifier = expr;
+    if(match_types(TOKEN_KEYWORD_FLOAT) || match_types(TOKEN_KEYWORD_INT))
+    {
+        //Grab the token type, the type of variable.
+        TokenType var_type = current_token.token_type;
+        advance();
+        
+        return parse_variable(var_type, false);
+    }
+
+    return parse_expr();
+}
+
 //Plus/Minus operation for two numbers, variable re-assignment
 ASTPtr Parser::parse_expr()
 {
@@ -111,6 +186,32 @@ ASTPtr Parser::parse_expr()
             return parse_variable(elem->second, true);
         }
     }
+
+    return common_binary_op(std::bind(parse_comp_expr, this), TOKEN_AND, TOKEN_OR, std::bind(parse_comp_expr, this));
+}
+
+//! expression or arith_expr along with  
+ASTPtr Parser::parse_comp_expr()
+{
+    //For ! expr
+    if(match_types(TOKEN_NOT))
+    {
+        TokenType type = current_token.token_type;
+        advance();
+        
+        //Get Comparision expression again
+        auto expr = parse_comp_expr();
+
+        return create_unary_op_node(type, std::move(expr));
+    }
+    //For the other stuff, they all have same precedance so just pass them all in common binary op
+    ///Note: Mask (comparisionTypeMask) already exists in ast.hpp
+    return common_binary_op(std::bind(parse_arith_expr, this), comparisionTypeMask, std::bind(parse_arith_expr, this));
+}
+
+//Plus/Minus operation
+ASTPtr Parser::parse_arith_expr()
+{
     return common_binary_op(std::bind(&parse_term, this), TOKEN_PLUS, TOKEN_MINUS);
 }
 
@@ -193,47 +294,7 @@ ASTPtr Parser::parse_atom()
     }
 }
 
-ASTPtr Parser::parse_cast()
-{
-    advance();
-    //Look for '<'
-    if(!match_types(TOKEN_LT))
-        printError("ParserError", "'Cast' Expected '<'");
-        
-    advance();
-    
-    //Get a type: Int, Float, etc
-    if((!match_types(TOKEN_KEYWORD_INT)) && (!match_types(TOKEN_KEYWORD_FLOAT)))
-        printError("ParserError", "'Cast' Expected a type after '<': like Int, Float, etc");
-    
-    TokenType eval_type = current_token.token_type;
-    advance();
-
-    //Look for '>'
-    if(!match_types(TOKEN_GT))
-        printError("ParserError", "'Cast' Expected '>'");
-
-    advance();
-
-    //look for '(' before parsing expr
-    if(!match_types(TOKEN_LPAREN))
-        printError("ParserError", "'Cast' Expected '('");
-
-    advance();
-
-    auto expr = parse_expr();
-
-    //look for ')'
-    if(!match_types(TOKEN_RPAREN))
-        printError("ParserError", "'Cast' Expected ')'");
-
-    advance();
-
-    //construct and return the dummy ast node
-    return create_cast_dummy_node(eval_type, std::move(expr));
-}
-
-//------------------------ Node creation ------------------------
+//-----------------NODE CREATION-----------------
 ASTPtr Parser::create_value_node(const Token& token)
 {
     return std::make_unique<ASTValue>(token.token_type, token.token_value);
@@ -264,7 +325,7 @@ ASTPtr Parser::create_cast_dummy_node(TokenType eval_type, ASTPtr&& expr)
     return std::make_unique<ASTCastDummy>(eval_type, std::move(expr));
 }
 
-//------------------------ Helper functions ------------------------
+//-----------------ACTUALLY Helper functions-----------------
 void Parser::advance()
 {
     current_token = lex.get_token();

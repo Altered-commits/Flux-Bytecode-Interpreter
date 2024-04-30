@@ -68,6 +68,19 @@ void Lexer::lex_identifier_or_keyword()
         set_token(temp, TOKEN_ID);
 }
 
+void Lexer::lex_this_or_eq_variation(const char* text, const char* text_with_eq, TokenType type, TokenType type_with_eq)
+{
+    advance();
+    if(cur_chr == '=')
+    {
+        advance();
+        set_token(text_with_eq, type_with_eq);
+        return;
+    }
+    set_token(text, type);
+    return;
+}
+
 void Lexer::lex() 
 {
     skip_spaces();
@@ -109,22 +122,46 @@ void Lexer::lex()
             set_token(")", TOKEN_RPAREN);
             advance();
             return;
-        case '<':
-            set_token("<", TOKEN_LT);
-            advance();
-            return;
-        case '>':
-            set_token(">", TOKEN_GT);
-            advance();
-            return;
         case '^':
             set_token("^", TOKEN_POW);
             advance();
             return;
-        case '=':
-            set_token("=", TOKEN_EQ);
+        case '&':
             advance();
+            if(cur_chr == '&') {
+                advance();
+                set_token("&&", TOKEN_AND);
+                return;
+            }
+            printError("LexerError", "'&' bitwise operator currently not supported");
             return;
+        case '|':
+            advance();
+            if(cur_chr == '|') {
+                advance();
+                set_token("||", TOKEN_OR);
+                return;
+            }
+            printError("LexerError", "'|' bitwise operator currently not supported");
+            return;
+        //Functions self explanatory
+        case '<':
+            //Check either '<' or '<='
+            lex_this_or_eq_variation("<", "<=", TOKEN_LT, TOKEN_LTEQ);
+            return;
+        case '>':
+            //Check either '>' or '>='
+            lex_this_or_eq_variation(">", ">=", TOKEN_GT, TOKEN_GTEQ);
+            return;
+        case '!':
+            //Either '!' not operator, or '!=' operator
+            lex_this_or_eq_variation("!", "!=", TOKEN_NOT, TOKEN_NEQ);
+            return;
+        case '=':
+            //Check if its '==' or simple '='
+            lex_this_or_eq_variation("=", "==", TOKEN_EQ, TOKEN_EEQ);
+            return;
+        //End of statements
         case ';':
             set_token(";", TOKEN_SEMIC);
             advance();
