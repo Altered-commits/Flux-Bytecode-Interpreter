@@ -215,7 +215,7 @@ void ByteCodeInterpreter::readFromFile()
             case ILInstruction::CMP_GT:
             case ILInstruction::CMP_LTEQ:
             case ILInstruction::CMP_GTEQ:
-            //Logical Operations, NOT handled seperately
+            //Logical Operations
             case ILInstruction::AND:
             case ILInstruction::OR:
             case ILInstruction::NOT:
@@ -282,7 +282,7 @@ void ByteCodeInterpreter::compare(const T& arg1, const U& arg2, ILInstruction in
             result = (arg1 >= arg2);
             break;
         //Logical operations
-        case ILInstruction::ADD:
+        case ILInstruction::AND:
             result = (arg1 && arg2);
             break;
         case ILInstruction::OR:
