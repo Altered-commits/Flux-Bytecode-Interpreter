@@ -146,7 +146,7 @@ void ByteCodeInterpreter::handleComparisionAndLogical(ILInstruction inst)
             globalStack.pop();
 
             std::visit([&](auto&& arg1, auto&& arg2){
-                compare(arg1, arg2, inst);
+                compare(arg2, arg1, inst);
             }, elem1, elem2);
             break;
     }
