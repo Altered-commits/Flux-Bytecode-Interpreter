@@ -36,6 +36,7 @@ class ILGenerator : public ASTVisitorInterface {
         void visit(ASTVariableAssign&, bool);
         void visit(ASTVariableAccess&, bool);
         void visit(ASTCastDummy&, bool);
+        void visit(ASTBlock&, bool);
 
     private:
         std::vector<ASTPtr>    ast_statements;

@@ -26,6 +26,7 @@ struct ASTUnaryOp;
 struct ASTVariableAssign;
 struct ASTVariableAccess;
 struct ASTCastDummy;
+struct ASTBlock;
 
 //We will be using the -> Visitor Pattern
 //--------Visitor interface--------
@@ -40,6 +41,7 @@ class ASTVisitorInterface
         virtual void visit(ASTVariableAssign& node, bool) = 0;
         virtual void visit(ASTVariableAccess& node, bool) = 0;
         virtual void visit(ASTCastDummy& node, bool)      = 0;
+        virtual void visit(ASTBlock& node, bool)          = 0;
 };
 
 //AST nodes
@@ -226,6 +228,34 @@ struct ASTCastDummy : public ASTNode
 
     TokenType evaluateExprType() const override {
         return eval_type == TOKEN_KEYWORD_FLOAT ? TOKEN_FLOAT : TOKEN_INT;
+    }
+};
+
+struct ASTBlock : public ASTNode
+{
+    std::vector<ASTPtr> statements;
+
+    ASTBlock(std::vector<ASTPtr>&& statements)
+        : statements(std::move(statements))
+    {}
+
+    const std::vector<ASTPtr>& getStatements() const {
+        return statements;
+    }
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+
+    bool isFloat() const override {
+        return false;
+    }
+    bool isPowerOp() const override {
+        return false;
+    }
+
+    TokenType evaluateExprType() const override {
+        return TOKEN_UNKNOWN;
     }
 };
 

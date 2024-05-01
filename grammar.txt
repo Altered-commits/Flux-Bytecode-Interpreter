@@ -1,5 +1,6 @@
-STATEMENT: Int/Float identifier = EXPRESSION
-         : EXPRESSION
+STATEMENT: Int/Float identifier = EXPRESSION;
+         : Int/Float identifier;
+         : EXPRESSION;
 
 EXPRESSION: identifier = COMP_EXPRESSION ( && | || COMP_EXPRESSION)*
 

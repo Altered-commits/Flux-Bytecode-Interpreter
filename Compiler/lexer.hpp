@@ -3,6 +3,7 @@
 
 #include <string>
 #include <cstdint>
+#include <unordered_map>
 #include "token.hpp"
 
 #define SANITY_CHECK(cnd) ((cur_chr != '\0') && (cnd))
@@ -56,7 +57,7 @@ class Lexer
     
     private:
         //For Differentiation of keyword and identifier
-        const std::map<std::string, TokenType> identifier_map = {
+        const std::unordered_map<std::string, TokenType> identifier_map = {
             {"Int", TOKEN_KEYWORD_INT},
             {"Float", TOKEN_KEYWORD_FLOAT},
             {"Cast", TOKEN_KEYWORD_CAST},

@@ -2,7 +2,7 @@
 #define UNNAMED_PARSER_HPP
 
 #include <functional>
-#include <map>
+#include <unordered_map>
 
 #include "lexer.hpp"
 #include "ast.hpp"
@@ -31,6 +31,8 @@ class Parser
     private:
         ASTPtr parse_cast();
         ASTPtr parse_variable(TokenType, bool);
+        ASTPtr parse_reassignment(TokenType);
+        ASTPtr parse_declaration(TokenType);
         ASTPtr common_binary_op(ParseFuncPtr, TokenType, TokenType, ParseFuncPtr);
         ASTPtr common_binary_op(ParseFuncPtr, std::size_t, ParseFuncPtr);
     
@@ -41,6 +43,7 @@ class Parser
         ASTPtr create_variable_assign_node(TokenType, const std::string&, ASTPtr&&);
         ASTPtr create_variable_access_node(TokenType, const std::string&);
         ASTPtr create_cast_dummy_node(TokenType, ASTPtr&&);
+        ASTPtr create_block_node(std::vector<ASTPtr>&&);
 
     private:
         void advance();
@@ -53,7 +56,12 @@ class Parser
 
         std::vector<ASTPtr> statements;
         //Temporary symbol table for variables
-        std::map<std::string, TokenType> temporary_symbol_table;
+        std::unordered_map<std::string, TokenType> temporary_symbol_table;
+        //Keyword to primitive type mapper, cuz i dont know how to properly optimize and code
+        const std::unordered_map<TokenType, TokenType> keyword_to_primitive_type = {
+            {TOKEN_KEYWORD_FLOAT, TOKEN_FLOAT},
+            {TOKEN_KEYWORD_INT, TOKEN_INT},
+        };
 };
 
 #endif

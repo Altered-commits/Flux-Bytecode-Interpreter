@@ -2,7 +2,6 @@
 #define UNNAMED_TOKEN_HPP
 
 #include <string>
-#include <map>
 
 enum TokenType {
     //Primitive Types
@@ -37,13 +36,22 @@ enum TokenType {
     TOKEN_KEYWORD_INT,
     TOKEN_KEYWORD_FLOAT,
     TOKEN_KEYWORD_CAST,
+    //, Type
+    TOKEN_COMMA,
     //Statement End
     TOKEN_SEMIC,
-    TOKEN_EOF
+    TOKEN_EOF,
+    //Idk
+    TOKEN_UNKNOWN
 };
 
 struct Token
 {
+    Token(const char* val, TokenType type)
+        : token_value(val), token_type(type)
+    {}
+    Token() = default;
+
     std::string  token_value;
     TokenType    token_type;
 };

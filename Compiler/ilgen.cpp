@@ -174,3 +174,10 @@ void ILGenerator::visit(ASTCastDummy& expr, bool is_sub_expr)
             break;
     }
 }
+
+void ILGenerator::visit(ASTBlock& statements, bool is_sub_expr)
+{
+    //Its just block of statements / expressions, just let the expr do the job
+    for (auto &&expr : statements.getStatements())
+        expr->accept(*this, is_sub_expr);
+}

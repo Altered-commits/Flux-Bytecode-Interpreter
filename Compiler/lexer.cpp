@@ -2,8 +2,8 @@
 #include "lexer.hpp"
 
 //Global stuff ig
-std::size_t Lexer::line = 0;
-std::size_t Lexer::col = 0;
+std::size_t Lexer::line = 1;
+std::size_t Lexer::col = 1;
 
 void Lexer::advance()
 {
@@ -160,6 +160,11 @@ void Lexer::lex()
         case '=':
             //Check if its '==' or simple '='
             lex_this_or_eq_variation("=", "==", TOKEN_EQ, TOKEN_EEQ);
+            return;
+        //,
+        case ',':
+            set_token(",", TOKEN_COMMA);
+            advance();
             return;
         //End of statements
         case ';':

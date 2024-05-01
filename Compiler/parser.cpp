@@ -68,7 +68,7 @@ ASTPtr Parser::parse_cast()
     return create_cast_dummy_node(eval_type, std::move(expr));
 }
 
-ASTPtr Parser::parse_variable(TokenType var_type, bool is_reassignment)
+ASTPtr Parser::parse_reassignment(TokenType var_type)
 {
     //Grab the identifier
     if(!match_types(TOKEN_ID))
@@ -76,31 +76,96 @@ ASTPtr Parser::parse_variable(TokenType var_type, bool is_reassignment)
 
     //Variable name should not clash with the existing names
     std::string identifier = current_token.token_value;
-    if((temporary_symbol_table.find(identifier) != temporary_symbol_table.end()) && (!is_reassignment))
+    if((temporary_symbol_table.find(identifier) != temporary_symbol_table.end()))
         printError("ParserError", "Current variable: ", identifier, " already exists, use another name");
 
     advance();
 
     //Check for Equals symbol
     if(!match_types(TOKEN_EQ))
-        printError("ParserError", "Expected '=' after identifier");
-
+        printError("ParserError", "Variable reassignment requires '=' after identifier");
+    
     advance();
 
     //The value of variable, the expression
     auto var_expr  = parse_expr();
     auto expr_type = var_expr->evaluateExprType();
 
-    if((expr_type == TOKEN_FLOAT && var_type == TOKEN_KEYWORD_FLOAT)
-        ||
-        (expr_type == TOKEN_INT && var_type == TOKEN_KEYWORD_INT))
+    if(keyword_to_primitive_type.at(var_type) == expr_type)
     {
         //Add it to symbol table and create AST
         temporary_symbol_table[identifier] = var_type;
         return create_variable_assign_node(var_type, identifier, std::move(var_expr));
     }
     //Oops, types dont match, errrorrrrr!
-    printError("ParserError", "Evaluated expression type doesn't match the type specified to variable.");    
+    printError("ParserError", "Evaluated expression type doesn't match the type pre-assigned to variable: ", identifier);
+}
+
+ASTPtr Parser::parse_declaration(TokenType var_type)
+{
+    std::vector<ASTPtr> declarations;
+    //We check for multiple variables to assign for
+    //Type identifier, identifier = expr, identifier;
+    //What i can do is, each of it, i can just push it as a statement to statements vector
+    while(true)
+    {
+        //Grab the identifier
+        if(!match_types(TOKEN_ID))
+            printError("ParserError", "Expected identifier after type");
+
+        //Variable name should not clash with the existing names
+        std::string identifier = current_token.token_value;
+        if((temporary_symbol_table.find(identifier) != temporary_symbol_table.end()))
+            printError("ParserError", "Current variable: ", identifier, " already exists, use another name");
+
+        advance();
+
+        //Check for Equals symbol, if not found, we assuming its like Int a; initialize the value to 0
+        if(!match_types(TOKEN_EQ))
+        {
+            temporary_symbol_table[identifier] = var_type;
+            //Yeah its a bit hard to understand but uhh yeah
+            declarations.emplace_back(create_variable_assign_node(
+                    var_type, identifier, create_value_node(Token("0", keyword_to_primitive_type.at(var_type)))));
+        }
+        //We found '=' symbol   
+        else
+        {
+            advance();
+
+            //The value of variable, the expression
+            auto var_expr  = parse_expr();
+            auto expr_type = var_expr->evaluateExprType();
+
+            if(keyword_to_primitive_type.at(var_type) == expr_type)
+            {
+                //Add it to symbol table and create AST
+                temporary_symbol_table[identifier] = var_type;
+                declarations.emplace_back(create_variable_assign_node(var_type, identifier, std::move(var_expr)));
+            }
+            else
+                //Oops, types dont match, errrorrrrr!
+                printError("ParserError", "Evaluated expression type doesn't match the type pre-assigned to variable: ", identifier);
+        }
+        //Now we look for ',' if we dont find it, then we know that we reached the end of it;
+        if(!match_types(TOKEN_COMMA))
+            break;
+        advance();
+    }
+
+    //return ASTBlock after we r done parsing this
+    return create_block_node(std::move(declarations));
+}
+
+ASTPtr Parser::parse_variable(TokenType var_type, bool is_reassignment)
+{
+    switch (is_reassignment)
+    {
+        case true:
+            return parse_reassignment(var_type);
+        case false:
+            return parse_declaration(var_type);
+    }
 }
 
 //common binary operations such as addition, subtraction etc
@@ -323,6 +388,11 @@ ASTPtr Parser::create_variable_access_node(TokenType var_type, const std::string
 ASTPtr Parser::create_cast_dummy_node(TokenType eval_type, ASTPtr&& expr)
 {
     return std::make_unique<ASTCastDummy>(eval_type, std::move(expr));
+}
+
+ASTPtr Parser::create_block_node(std::vector<ASTPtr>&& statements)
+{
+    return std::make_unique<ASTBlock>(std::move(statements));
 }
 
 //-----------------ACTUALLY Helper functions-----------------

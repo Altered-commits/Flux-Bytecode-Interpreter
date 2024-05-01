@@ -1,5 +1,5 @@
 #include <stack>
-#include <map>
+#include <unordered_map>
 
 #include "interpreter.hpp"
 //Byte code will be like this
@@ -9,7 +9,7 @@
 std::stack<ValueType> globalStack;
 
 //Global symbol table
-std::map<std::string, ValueType> globalSymbolTable;
+std::unordered_map<std::string, ValueType> globalSymbolTable;
 
 void ByteCodeInterpreter::handleIntegerArithmetic(ILInstruction inst)
 {
