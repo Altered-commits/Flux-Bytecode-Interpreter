@@ -1,22 +1,26 @@
-STATEMENT: Int/Float identifier = EXPRESSION;
-         : Int/Float identifier;
-         : EXPRESSION;
+<STATEMENT> ::= 'Int'/'Float' <identifier> '=' <EXPRESSION> ';'
+              | 'Int'/'Float' <identifier> ';'
+              | <EXPRESSION> ';'
 
-EXPRESSION: identifier = COMP_EXPRESSION ( && | || COMP_EXPRESSION)*
+<EXPRESSION> ::= <assignment> (',' <assignment>)*
 
-COMP_EXPRESSION: ! COMP_EXPRESSION
-               : ARITH_EXPRESSION ((== | != | < | > | <= | >=) ARITH_EXPRESSION)*
+<assignment> ::= <identifier> '=' <COMP_EXPRESSION>
+               | <identifier>
 
-ARITH_EXPRESSION : TERM (PLUS | MINUS TERM)*
+<COMP_EXPRESSION> ::= '!' <COMP_EXPRESSION>
+                    | <ARITH_EXPRESSION> ( ('==' | '!=' | '<' | '>' | '<=' | '>=') <ARITH_EXPRESSION> )*
 
-TERM: FACTOR (MULT | DIV FACTOR)*
+<ARITH_EXPRESSION> ::= <TERM> ( ('+' | '-') <TERM> )*
 
-FACTOR: (+*-* EXPRESSION)*
-      : POWER
+<TERM> ::= <FACTOR> ( ('*' | '/') <FACTOR> )*
 
-POWER: ATOM (^ FACTOR)*
+<FACTOR> ::= ( ('+' | '-')* <EXPRESSION> )
+           | <POWER>
 
-ATOM: identifier
-    : INT, FLOAT
-    : (EXPRESSION)
-    : Cast<Int/Float>(EXPRESSION)
+<POWER> ::= <ATOM> ('^' <FACTOR>)*
+
+<ATOM> ::= <identifier>
+         | <INT>
+         | <FLOAT>
+         | '(' <EXPRESSION> ')'
+         | Cast<Int/Float>(<EXPRESSION>)

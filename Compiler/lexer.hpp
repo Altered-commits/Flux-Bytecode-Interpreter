@@ -36,6 +36,8 @@ class Lexer
         void set_token(const std::string&, TokenType);
 
         void skip_spaces();
+        void skip_single_line_comments();
+        void skip_multi_line_comments();
         void lex_digits();
         void lex_identifier_or_keyword();
         void lex_this_or_eq_variation(const char*, const char*, TokenType, TokenType);

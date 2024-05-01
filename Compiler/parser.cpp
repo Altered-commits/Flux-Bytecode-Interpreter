@@ -145,7 +145,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
             }
             else
                 //Oops, types dont match, errrorrrrr!
-                printError("ParserError", "Evaluated expression type doesn't match the type pre-assigned to variable: ", identifier);
+                printError("ParserError", "Evaluated expression type doesn't match the type assigned to variable: ", identifier);
         }
         //Now we look for ',' if we dont find it, then we know that we reached the end of it;
         if(!match_types(TOKEN_COMMA))
