@@ -1,3 +1,11 @@
-Float x; Float y = 3.141596;
-
-(x = y) ? y - 3 : y + 10;
+Float a = 10.4;
+Float b = 10.0;
+If(a == 10.4)
+{
+    Int c = 9;
+    Float b = 9.04;
+}
+Else {
+    b = 0.0;
+}
+b;

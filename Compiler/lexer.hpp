@@ -63,6 +63,9 @@ class Lexer
             {"Int", TOKEN_KEYWORD_INT},
             {"Float", TOKEN_KEYWORD_FLOAT},
             {"Cast", TOKEN_KEYWORD_CAST},
+            {"If", TOKEN_KEYWORD_IF},
+            {"Elif", TOKEN_KEYWORD_ELIF},
+            {"Else", TOKEN_KEYWORD_ELSE}
         };
 
 };

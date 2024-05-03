@@ -53,6 +53,13 @@ class ByteCodeInterpreter {
         void handleJumpIfFalse(std::size_t);
         void handleJump(std::size_t);
     
+    //Symbol table related
+    private:
+        void   createSymbolTable();
+        void   destroySymbolTable();
+        Object getValueFromSymbolTable(const std::string&);
+        void   setValueToSymbolTable(const std::string&, Object);
+    
     private: //Helper functions
         std::string& readStringFromFile();
         

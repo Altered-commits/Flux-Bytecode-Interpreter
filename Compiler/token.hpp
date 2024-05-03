@@ -10,6 +10,9 @@ enum TokenType {
     //() Type
     TOKEN_LPAREN,
     TOKEN_RPAREN,
+    //{} Type,
+    TOKEN_LBRACE,
+    TOKEN_RBRACE,
     //<> Type
     TOKEN_LT,
     TOKEN_GT,
@@ -36,6 +39,9 @@ enum TokenType {
     TOKEN_KEYWORD_INT,
     TOKEN_KEYWORD_FLOAT,
     TOKEN_KEYWORD_CAST,
+    TOKEN_KEYWORD_IF,
+    TOKEN_KEYWORD_ELIF,
+    TOKEN_KEYWORD_ELSE,
     //, Type
     TOKEN_COMMA,
     //Ternary(? :) Type,

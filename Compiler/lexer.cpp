@@ -149,6 +149,14 @@ void Lexer::lex()
                 set_token(")", TOKEN_RPAREN);
                 advance();
                 return;
+            case '{':
+                set_token("{", TOKEN_LBRACE);
+                advance();
+                return;
+            case '}':
+                set_token(")", TOKEN_RBRACE);
+                advance();
+                return;
             case '^':
                 set_token("^", TOKEN_POW);
                 advance();

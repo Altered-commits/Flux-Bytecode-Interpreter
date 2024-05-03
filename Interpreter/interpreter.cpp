@@ -6,8 +6,8 @@
 //Global Stack
 std::stack<Object> globalStack;
 
-//Global symbol table
-std::unordered_map<std::string, Object> globalSymbolTable;
+//Global symbol table (stack based scope, using vector)
+std::vector<std::unordered_map<std::string, Object>> globalSymbolTable;
 
 //Think of this as program counter
 std::size_t globalInstructionIndex = 0;
@@ -105,13 +105,13 @@ void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst, const std
         globalStack.pop();
 
     // and assign it to variable :D
-    globalSymbolTable[identifier] = elem;
+    setValueToSymbolTable(identifier, elem);
 }
 
 void ByteCodeInterpreter::handleVariableAccess(const std::string& identifier)
 {
     //Variant should handle the rest ig
-    globalStack.push(globalSymbolTable.at(identifier));
+    globalStack.push(getValueFromSymbolTable(identifier));
 }
 
 void ByteCodeInterpreter::handleCasting(ILInstruction inst)
@@ -295,6 +295,14 @@ void ByteCodeInterpreter::interpretInstructions()
             case ILInstruction::JUMP:
                 handleJump(std::get<std::size_t>(i.value));
                 break;
+            
+            //Symbol table
+            case ILInstruction::CREATE_SYMBOL_TABLE:
+                createSymbolTable();
+                break;
+            case ILInstruction::DESTROY_SYMBOL_TABLE:
+                destroySymbolTable();
+                break;
 
             case END_OF_FILE:
                 std::cout << "Successfully Interpreted, Read all symbols.\n";
@@ -315,6 +323,10 @@ void ByteCodeInterpreter::interpretInstructions()
 
 void ByteCodeInterpreter::interpret()
 {
+    //Initialize global symbol table with one layer / global layer
+    globalSymbolTable.push_back({});
+
+    //Decode and execute instructions
     decodeFile();
     interpretInstructions();
 }
@@ -379,4 +391,29 @@ void ByteCodeInterpreter::pushInstructionValue(const InstructionValue& val)
         if constexpr(std::is_same_v<T, int> || std::is_same_v<T, float>)
             globalStack.push(Object(arg));
     }, val);
+}
+
+//Symbol table related
+void ByteCodeInterpreter::createSymbolTable()
+{
+    globalSymbolTable.push_back({});
+}
+
+void ByteCodeInterpreter::destroySymbolTable()
+{
+    globalSymbolTable.pop_back();   
+}
+
+Object ByteCodeInterpreter::getValueFromSymbolTable(const std::string& id)
+{
+    for (auto it = globalSymbolTable.rbegin(); it != globalSymbolTable.rend(); ++it) {
+        if (it->count(id)) {
+            return (*it)[id];
+        }
+    }
+}
+
+void ByteCodeInterpreter::setValueToSymbolTable(const std::string& id, Object elem)
+{
+    globalSymbolTable.back()[id] = elem;
 }

@@ -1,5 +1,9 @@
 #include "ilgen.hpp"
 
+//Force generate these instructions (only to be used in ILGenerator functions)
+#define SCOPE_START il_code.emplace_back(ILInstruction::CREATE_SYMBOL_TABLE);
+#define SCOPE_END il_code.emplace_back(ILInstruction::DESTROY_SYMBOL_TABLE);
+
 std::vector<ILCommand>& ILGenerator::generateIL()
 {
     if(!ast_statements.empty())
@@ -213,4 +217,72 @@ void ILGenerator::visit(ASTTernaryOp& ternary_node, bool is_sub_expr)
     il_code[expr_jump_location].operand = std::to_string(il_code.size());
 
     std::cout << "FLOC: " << expr_jump_location + 1 << " ELOC: " << il_code.size() << '\n';
+}
+
+void ILGenerator::visit(ASTIfNode& if_node, bool is_sub_expr)
+{
+    SCOPE_START
+    //Some important variable
+    std::vector<std::size_t> elif_jump_locations;
+    //Generate if condition
+    if_node.if_condition->accept(*this, true);
+
+    //Jump if false, but heres the catch,
+    //Four cases:
+    //1) If; 2) If Else 3) If Elif; 4) If Elif Else
+    il_code.emplace_back(ILInstruction::JUMP_IF_FALSE);
+    std::size_t jump_if_condition = il_code.size() - 1;
+
+    std::cout << "JUMP_IF_FALSE (If)\n";
+
+    //Generate if body
+    if_node.if_body->accept(*this, is_sub_expr);
+
+    //Now unconditional jump to end of expression from here
+    il_code.emplace_back(ILInstruction::JUMP);
+    std::size_t jump_to_end_of_expr = il_code.size() - 1;
+    
+    std::cout << "JUMP (If)\n";
+
+    //False condition jump
+    il_code[jump_if_condition].operand = std::to_string(il_code.size());
+
+    //Look for all Elif conditions
+    for (auto &&[elif_condition, elif_body] : if_node.elif_clauses)
+    {
+        //Condition for Elif;
+        elif_condition->accept(*this, true);
+
+        //Check for condition (rest will be pretty much same as if)
+        il_code.emplace_back(ILInstruction::JUMP_IF_FALSE);
+        std::size_t jump_elif_condition = il_code.size() - 1;
+
+        std::cout << "JUMP_IF_FALSE (Elif)\n";
+
+        //Generate body
+        elif_body->accept(*this, is_sub_expr);
+
+        //Unconditional jump to end of Expression, except here we have multiple Elifs so
+        //Store values in vector
+        il_code.emplace_back(ILInstruction::JUMP);
+        elif_jump_locations.push_back(il_code.size() - 1);
+
+        std::cout << "JUMP (Elif)\n";
+
+        //Update the false condition jump to next Elif / Else
+        il_code[jump_elif_condition].operand = std::to_string(il_code.size());
+    }
+    
+    //If 'Else' exists, generate its body
+    if(if_node.else_body != nullptr)
+        if_node.else_body->accept(*this, is_sub_expr);
+    
+    //Whatever is at end is well the final location of end of "if condition"
+    il_code[jump_to_end_of_expr].operand = std::to_string(il_code.size());
+
+    //Also update all the Elifs final location like If
+    for (auto &&idx : elif_jump_locations)
+        il_code[idx].operand = std::to_string(il_code.size());
+    
+    SCOPE_END
 }

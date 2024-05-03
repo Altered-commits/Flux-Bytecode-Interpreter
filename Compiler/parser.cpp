@@ -7,12 +7,6 @@ std::vector<ASTPtr>& Parser::parse()
     {
         auto res = parse_statement();
         
-        //In case where the input is like: 50 50 instead of: 50 + 50, uk its an error
-        if(lex.get_current_token().token_type != TOKEN_SEMIC)
-            printError("ParserError", "Expected tokens: '+', '-', '*','/' or end the statement with a ';'");
-    
-        advance();
-        
         statements.push_back(std::move(res));
     }
 
@@ -20,6 +14,77 @@ std::vector<ASTPtr>& Parser::parse()
 }
 
 //-----------------TECHNICALLY Helper Functions-----------------
+ASTPtr Parser::parse_if_condition()
+{
+    // Check '('
+    if(!match_types(TOKEN_LPAREN))
+        printError("ParserError", "Expected '(' after 'If'");
+    
+    advance();
+
+    //Now parse condition
+    auto if_condition = parse_expr();
+
+    //Now we need ')'
+    if(!match_types(TOKEN_RPAREN))
+        printError("ParserError", "Expected ')' after condition for If clause");
+    advance();
+
+    //Look for '{' body '}'
+    ASTPtr if_body = parse_block();
+
+    //Now check for Elif clauses, if they exist that is. Condition, Body
+    std::vector<std::pair<ASTPtr, ASTPtr>> elif_clauses;
+    while(match_types(TOKEN_KEYWORD_ELIF))
+    {
+        advance();
+        //same thing, look for '( condition ')
+        if(!match_types(TOKEN_LPAREN)) printError("ParserError", "Expected '(' after 'Elif'");
+        advance();
+        
+        auto elif_condition = parse_expr();
+        
+        if(!match_types(TOKEN_RPAREN)) printError("ParserError", "Expected ')' for Elif clause after condition");
+        advance();
+
+        //'{' body '}'
+        auto elif_body = parse_block();
+
+        elif_clauses.push_back({std::move(elif_condition), std::move(elif_body)});
+    }
+
+    //Look for else if it exists
+    ASTPtr else_block = nullptr;
+    if(match_types(TOKEN_KEYWORD_ELSE))
+    {
+        advance();
+        //Just look for a code block for Else
+        else_block = parse_block();
+    }
+
+    //With all the information create IfNode
+    return create_if_node(std::move(if_condition), std::move(if_body), std::move(elif_clauses), std::move(else_block));
+}
+
+ASTPtr Parser::parse_block()
+{
+    if(!match_types(TOKEN_LBRACE)) printError("ParserError", "Expected '{' after ')'");
+    advance();
+
+    std::vector<ASTPtr> statements;
+    while(!match_types(TOKEN_RBRACE))
+    {
+        auto statement = parse_statement();
+        //Add to list of statements
+        statements.emplace_back(std::move(statement));
+    }
+    
+    if(!match_types(TOKEN_RBRACE)) printError("ParserError", "Expected '}'");
+    advance();
+
+    return create_block_node(std::move(statements));
+}
+
 ASTPtr Parser::parse_cast()
 {
     advance();
@@ -77,7 +142,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type)
     //Variable name should exist
     std::string identifier = current_token.token_value;
     if(get_variable_from_symbol_table(identifier) == TOKEN_UNKNOWN)
-        printError("ParserError", "Current variable: ", identifier, " doesn't exist.");
+        printError("ParserError", "Current variable: '", identifier, "' doesn't exist.");
 
     advance();
 
@@ -115,7 +180,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
 
         //Variable name should not clash with the existing names
         std::string identifier = current_token.token_value;
-        if(get_variable_from_symbol_table(identifier) != TOKEN_UNKNOWN)
+        if(find_variable_from_current_scope(identifier))
             printError("ParserError", "Current variable: ", identifier, " already exists, use another name");
 
         advance();
@@ -223,17 +288,45 @@ ASTPtr Parser::common_binary_op(
 //-----------------START OF PARSING-----------------
 ASTPtr Parser::parse_statement()
 {
-    //Variable declaration, float/int identifier = expr;
-    if(match_types(TOKEN_KEYWORD_FLOAT) || match_types(TOKEN_KEYWORD_INT))
+    ASTPtr    function_return_value = nullptr;
+    TokenType statement_type = current_token.token_type;
+
+    switch(statement_type)
     {
-        //Grab the token type, the type of variable.
-        TokenType var_type = current_token.token_type;
+        case TOKEN_KEYWORD_FLOAT:
+        case TOKEN_KEYWORD_INT:
+        {
+            TokenType var_type = current_token.token_type;
+            advance();
+            function_return_value = parse_variable(var_type, false);
+        }
+        break;
+        case TOKEN_KEYWORD_IF:
+        {
+            advance();
+            create_scope();
+            function_return_value = parse_if_condition();
+            destroy_scope();
+        }
+        break;
+        default:
+            function_return_value = parse_expr();
+            break;
+    }
+    
+    //Semi colon only when some conditions aka ignore some keywords
+    if(!(statement_type >= TOKEN_KEYWORD_IF
+        && 
+        statement_type <= TOKEN_KEYWORD_ELSE))
+    {
+        //If the expression makes sense, the user should also end it with a semicolon as well
+        if(!match_types(TOKEN_SEMIC))
+            printError("ParserError", "Expected tokens: '+', '-', '*','/' or end the statement with a ';'");
+
         advance();
-        
-        return parse_variable(var_type, false);
     }
 
-    return parse_expr();
+    return function_return_value;
 }
 
 //Plus/Minus operation for two numbers, variable re-assignment
@@ -424,6 +517,11 @@ ASTPtr Parser::create_ternary_op_node(ASTPtr&& condition, ASTPtr&& true_expr, AS
     return std::make_unique<ASTTernaryOp>(std::move(condition), std::move(true_expr), std::move(false_expr)); 
 }
 
+ASTPtr Parser::create_if_node(ASTPtr&& if_cond, ASTPtr&& if_body, std::vector<std::pair<ASTPtr, ASTPtr>>&& elif_clauses, ASTPtr&& else_body)
+{
+    return std::make_unique<ASTIfNode>(std::move(if_cond), std::move(if_body), std::move(elif_clauses), std::move(else_body));
+}
+
 //-----------------ACTUALLY Helper functions-----------------
 void Parser::advance()
 {
@@ -455,6 +553,11 @@ TokenType Parser::get_variable_from_symbol_table(const std::string& id)
         }
     }
     return TOKEN_UNKNOWN;
+}
+
+bool Parser::find_variable_from_current_scope(const std::string& identifier)
+{
+    return temporary_symbol_table.back().count(identifier) ? true : false;    
 }
 
 void Parser::create_scope()

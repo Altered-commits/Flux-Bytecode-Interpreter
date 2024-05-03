@@ -33,6 +33,8 @@ class Parser
         ASTPtr parse_atom();
     
     private:
+        ASTPtr parse_if_condition();
+        ASTPtr parse_block();
         ASTPtr parse_cast();
         ASTPtr parse_variable(TokenType, bool);
         ASTPtr parse_reassignment(TokenType);
@@ -49,11 +51,13 @@ class Parser
         ASTPtr create_cast_dummy_node(TokenType, ASTPtr&&);
         ASTPtr create_block_node(std::vector<ASTPtr>&&);
         ASTPtr create_ternary_op_node(ASTPtr&&, ASTPtr&&, ASTPtr&&);
+        ASTPtr create_if_node(ASTPtr&&, ASTPtr&&, std::vector<std::pair<ASTPtr, ASTPtr>>&&, ASTPtr&&);
 
     //Scope
     private:
         void      add_variable_to_symbol_table(const std::string&, TokenType);
         TokenType get_variable_from_symbol_table(const std::string&);
+        bool      find_variable_from_current_scope(const std::string&);
         void      create_scope();
         void      destroy_scope();
 
@@ -68,7 +72,6 @@ class Parser
 
         std::vector<ASTPtr> statements;
         //Temporary symbol table for variables, stack based scoping mechanism
-        
         std::vector<std::unordered_map<std::string, TokenType>> temporary_symbol_table;
 
         //Keyword to primitive type mapper, cuz i dont know how to properly optimize and code

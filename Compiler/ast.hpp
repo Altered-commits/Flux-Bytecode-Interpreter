@@ -28,6 +28,7 @@ struct ASTVariableAccess;
 struct ASTCastDummy;
 struct ASTBlock;
 struct ASTTernaryOp;
+struct ASTIfNode;
 
 //We will be using the -> Visitor Pattern
 //--------Visitor interface--------
@@ -44,6 +45,7 @@ class ASTVisitorInterface
         virtual void visit(ASTCastDummy& node, bool)      = 0;
         virtual void visit(ASTBlock& node, bool)          = 0;
         virtual void visit(ASTTernaryOp& node, bool)      = 0;
+        virtual void visit(ASTIfNode& node, bool)         = 0;
 };
 
 //AST nodes
@@ -290,6 +292,37 @@ struct ASTTernaryOp : public ASTNode
             return TOKEN_FLOAT;
         }
         return false_expr->evaluateExprType();
+    }
+};
+
+//real
+struct ASTIfNode : ASTNode
+{
+    //If
+    ASTPtr if_condition;
+    ASTPtr if_body;
+    //Multiple Elif's or no Elif: pair -> condition, body
+    std::vector<std::pair<ASTPtr, ASTPtr>> elif_clauses;
+    //Else
+    ASTPtr else_body;
+
+    ASTIfNode(ASTPtr&& ifc, ASTPtr&& ifb, std::vector<std::pair<ASTPtr, ASTPtr>>&& elfc, ASTPtr&& eb = nullptr)
+        : if_condition(std::move(ifc)), if_body(std::move(ifb)), elif_clauses(std::move(elfc)), else_body(std::move(eb))
+    {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+
+    bool isFloat() const override {
+        return false;
+    }
+    bool isPowerOp() const override {
+        return false;
+    }
+
+    TokenType evaluateExprType() const override {
+        return TOKEN_UNKNOWN;
     }
 };
 

@@ -42,6 +42,9 @@ enum ILInstruction : std::uint8_t
     //Jump operations
     JUMP_IF_FALSE,
     JUMP,
+    //Scope symbol table related operation
+    CREATE_SYMBOL_TABLE,
+    DESTROY_SYMBOL_TABLE,
     //EOF
     END_OF_FILE
 };
