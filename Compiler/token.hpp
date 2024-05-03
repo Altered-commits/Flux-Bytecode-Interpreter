@@ -38,6 +38,9 @@ enum TokenType {
     TOKEN_KEYWORD_CAST,
     //, Type
     TOKEN_COMMA,
+    //Ternary(? :) Type,
+    TOKEN_QUESTION,
+    TOKEN_COLON,
     //Statement End
     TOKEN_SEMIC,
     TOKEN_EOF,

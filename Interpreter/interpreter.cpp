@@ -2,14 +2,15 @@
 #include <unordered_map>
 
 #include "interpreter.hpp"
-//Byte code will be like this
-//Instruction Operand 
 
 //Global Stack
-std::stack<ValueType> globalStack;
+std::stack<Object> globalStack;
 
 //Global symbol table
-std::unordered_map<std::string, ValueType> globalSymbolTable;
+std::unordered_map<std::string, Object> globalSymbolTable;
+
+//Think of this as program counter
+std::size_t globalInstructionIndex = 0;
 
 void ByteCodeInterpreter::handleIntegerArithmetic(ILInstruction inst)
 {
@@ -94,12 +95,9 @@ void ByteCodeInterpreter::handleUnaryArithmetic()
     }, globalStack.top());
 }
 
-void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst)
+void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst, const std::string& identifier)
 {
-    //After the instruction, read the variable and push it to global symbol table
-    std::string& identifier = readStringFromFile();
-    
-    //But before pushing it to symbol table, pop the stack to get evaluated expression
+    //Before pushing it to symbol table, pop the stack to get evaluated expression
     auto elem = globalStack.top();
 
     //Depending on the instruction, we either pop or dont pop
@@ -110,11 +108,8 @@ void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst)
     globalSymbolTable[identifier] = elem;
 }
 
-void ByteCodeInterpreter::handleVariableAccess()
+void ByteCodeInterpreter::handleVariableAccess(const std::string& identifier)
 {
-    //Read the variable name
-    std::string& identifier = readStringFromFile();
-
     //Variant should handle the rest ig
     globalStack.push(globalSymbolTable.at(identifier));
 }
@@ -152,32 +147,92 @@ void ByteCodeInterpreter::handleComparisionAndLogical(ILInstruction inst)
     }
 }
 
-void ByteCodeInterpreter::readFromFile()
+void ByteCodeInterpreter::handleJumpIfFalse(std::size_t jumpOffset)
 {
-    bool shouldRead = true;
-    while (shouldRead)
+    //Pop the value of condition
+    std::visit([&](auto&& arg){
+        globalStack.pop();
+        //Check the condition, if arg is false, we jump, aka change the globalIndex
+        globalInstructionIndex = !arg ? jumpOffset - 1 : globalInstructionIndex;
+        //or we just dont do anything
+    }, globalStack.top());
+}
+
+void ByteCodeInterpreter::handleJump(std::size_t jumpOffset)
+{
+    //Simply seek to the location to jump, the reason why i do -1 is
+    //As soon as i complete this inst, globalInstructionIndex increments, which is where i want to jump uk
+    //Not the +1 from this and +1 from globalInstructionIndex increments;
+    globalInstructionIndex = jumpOffset - 1;
+}
+
+void ByteCodeInterpreter::decodeFile()
+{
+    bool hasInst = true;
+
+    while (hasInst)
     {
-        Byte instructionByte;
-        inFile.get(instructionByte);
-        
-        ILInstruction inst = static_cast<ILInstruction>(instructionByte);
+        Byte instByte;
+        inFile.get(instByte);
+
+        ILInstruction inst = static_cast<ILInstruction>(instByte);
+
         switch (inst)
         {
-            case ILInstruction::PUSH_INT:
+            case END_OF_FILE:
+                instructions.emplace_back(inst);
+                hasInst = false;
+                break;
+            //Primitive types
+            case PUSH_INT:
+            {
+                int intValue;
+                inFile.read(reinterpret_cast<Byte*>(&intValue), sizeof(int));
+                instructions.emplace_back(inst, std::move(intValue));
+            }
+            break;
+            case PUSH_FLOAT:
+            {
+                float floatValue;
+                inFile.read(reinterpret_cast<Byte*>(&floatValue), sizeof(float));
+                instructions.emplace_back(inst, std::move(floatValue));
+            }
+            break;
+            //Variable assignment / accessing
+            case ILInstruction::ASSIGN_VAR:
+            case ILInstruction::ASSIGN_VAR_NO_POP:
+            case ILInstruction::ACCESS_VAR:
+                instructions.emplace_back(inst, std::move(readStringFromFile()));
+                break;
+            
+            //Jump cases
+            case ILInstruction::JUMP:
+            case ILInstruction::JUMP_IF_FALSE:
                 {
-                    int intValue;
-                    inFile.read(reinterpret_cast<Byte*>(&intValue), sizeof(int));
-                    
-                    globalStack.push(intValue);
+                    std::size_t jumpOffset;
+                    inFile.read(reinterpret_cast<Byte*>(&jumpOffset), sizeof(size_t));
+                    instructions.emplace_back(inst, std::move(jumpOffset));
                 }
                 break;
-            case ILInstruction::PUSH_FLOAT:
-                {
-                    float floatValue;
-                    inFile.read(reinterpret_cast<Byte*>(&floatValue), sizeof(float));
+            //Rest of it just read instruction
+            default:
+                instructions.emplace_back(inst);
+                break;
+        }
+    }
+}
 
-                    globalStack.push(floatValue);
-                }
+void ByteCodeInterpreter::interpretInstructions()
+{
+    while(true)
+    {
+        Instruction& i = instructions[globalInstructionIndex];
+
+        switch (i.inst)
+        {
+            case ILInstruction::PUSH_INT:
+            case ILInstruction::PUSH_FLOAT:
+                pushInstructionValue(i.value);
                 break;
             
             //Unary Operations, '+' as unary -> useless ahh
@@ -190,13 +245,13 @@ void ByteCodeInterpreter::readFromFile()
             case ILInstruction::SUB:
             case ILInstruction::MUL:
             case ILInstruction::DIV:
-                handleIntegerArithmetic(inst);
+                handleIntegerArithmetic(i.inst);
                 break;
             
             //Casting stuff :D
             case ILInstruction::CAST_FLOAT:
             case ILInstruction::CAST_INT:
-                handleCasting(inst);
+                handleCasting(i.inst);
                 break;
             
             //Floating Operations and Power arithmetic, as it also requires both to be floating point
@@ -205,9 +260,9 @@ void ByteCodeInterpreter::readFromFile()
             case ILInstruction::FMUL:
             case ILInstruction::FDIV:
             case ILInstruction::POW:
-                handleFloatingArithmetic(inst);
+                handleFloatingArithmetic(i.inst);
                 break;
-            
+
             //Comparision Operations
             case ILInstruction::CMP_EQ:
             case ILInstruction::CMP_NEQ:
@@ -219,29 +274,49 @@ void ByteCodeInterpreter::readFromFile()
             case ILInstruction::AND:
             case ILInstruction::OR:
             case ILInstruction::NOT:
-                handleComparisionAndLogical(inst);
+                handleComparisionAndLogical(i.inst);
                 break;
-
+            
             //Assignment
             case ILInstruction::ASSIGN_VAR:
             case ILInstruction::ASSIGN_VAR_NO_POP:
-                handleVariableAssignment(inst);
+                handleVariableAssignment(i.inst, std::get<std::string>(i.value));
                 break;
             
             case ILInstruction::ACCESS_VAR:
-                handleVariableAccess();
+                handleVariableAccess(std::get<std::string>(i.value));
+                break;
+            
+            //Jump conditions
+            case ILInstruction::JUMP_IF_FALSE:
+                handleJumpIfFalse(std::get<std::size_t>(i.value));
+                break;
+            //Unconditional jump
+            case ILInstruction::JUMP:
+                handleJump(std::get<std::size_t>(i.value));
                 break;
 
-            //End of interpretation, close it
-            case ILInstruction::END_OF_FILE:
-                shouldRead = false; break;
-        }
-    }
-    std::cout << "Successfully Interpreted, Read all symbols.\n";
+            case END_OF_FILE:
+                std::cout << "Successfully Interpreted, Read all symbols.\n";
 
-    std::visit([](auto&& arg){
-        std::cout << "Top of stack: " << arg << '\n';
-    }, globalStack.top());
+                if(!globalStack.empty())
+                {
+                    std::visit([](auto&& arg){
+                        std::cout << "Top of stack: " << arg << '\n';
+                    }, globalStack.top());
+                }
+                return;
+        }
+        
+        //Increment instruction index at the end
+        ++globalInstructionIndex;
+    }
+}
+
+void ByteCodeInterpreter::interpret()
+{
+    decodeFile();
+    interpretInstructions();
 }
 
 //-----------------Helper Fuctions-----------------
@@ -294,4 +369,14 @@ void ByteCodeInterpreter::compare(const T& arg1, const U& arg2, ILInstruction in
             break;
     }
     globalStack.push(result);
+}
+
+void ByteCodeInterpreter::pushInstructionValue(const InstructionValue& val)
+{
+    std::visit([&](auto&& arg){
+        using T = std::decay_t<decltype(arg)>;
+
+        if constexpr(std::is_same_v<T, int> || std::is_same_v<T, float>)
+            globalStack.push(Object(arg));
+    }, val);
 }

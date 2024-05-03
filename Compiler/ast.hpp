@@ -27,6 +27,7 @@ struct ASTVariableAssign;
 struct ASTVariableAccess;
 struct ASTCastDummy;
 struct ASTBlock;
+struct ASTTernaryOp;
 
 //We will be using the -> Visitor Pattern
 //--------Visitor interface--------
@@ -42,6 +43,7 @@ class ASTVisitorInterface
         virtual void visit(ASTVariableAccess& node, bool) = 0;
         virtual void visit(ASTCastDummy& node, bool)      = 0;
         virtual void visit(ASTBlock& node, bool)          = 0;
+        virtual void visit(ASTTernaryOp& node, bool)      = 0;
 };
 
 //AST nodes
@@ -231,6 +233,7 @@ struct ASTCastDummy : public ASTNode
     }
 };
 
+//Can be used for multiple stuff, holding statements is used in alot of stuff like lists etc etc
 struct ASTBlock : public ASTNode
 {
     std::vector<ASTPtr> statements;
@@ -256,6 +259,37 @@ struct ASTBlock : public ASTNode
 
     TokenType evaluateExprType() const override {
         return TOKEN_UNKNOWN;
+    }
+};
+
+struct ASTTernaryOp : public ASTNode
+{
+    ASTPtr condition;
+    ASTPtr true_expr;
+    ASTPtr false_expr;
+
+    ASTTernaryOp(ASTPtr&& condition, ASTPtr&& true_expr, ASTPtr&& false_expr)
+        : condition(std::move(condition)), true_expr(std::move(true_expr)), false_expr(std::move(false_expr))
+    {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+
+    bool isFloat() const override {
+        return true_expr->isFloat() || false_expr->isFloat();
+    }
+
+    bool isPowerOp() const override {
+        return true_expr->isPowerOp() || false_expr->isPowerOp();
+    }
+
+    TokenType evaluateExprType() const override {
+        //If this isnt float, then just return whatver the other expression is
+        if (true_expr->evaluateExprType() == TOKEN_FLOAT) {
+            return TOKEN_FLOAT;
+        }
+        return false_expr->evaluateExprType();
     }
 };
 

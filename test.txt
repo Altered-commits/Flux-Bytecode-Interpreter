@@ -1,11 +1,3 @@
-Int _in__a = 10, _in__b;
+Float x; Float y = 3.141596;
 
-//Testing comments
-/*
- * Right now we are inside multi-line comment
- * As long as i dont terminate it using a combination of
- * '*' and '/' it wont terminate
- * Yeah i should terminate it now
- */
- 
-Cast<Float>((_in__a + 5.25526 == 15) + (15 != _in__b)) / 30;
+(x = y) ? 1 : 0;

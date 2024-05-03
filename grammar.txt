@@ -3,6 +3,9 @@
               | <EXPRESSION> ';'
 
 <EXPRESSION> ::= <assignment> (',' <assignment>)*
+              | <TERNARY_EXPR>
+
+<TERNARY_EXPR> ::= <COMP_EXPRESSION> '?' <EXPRESSION> ':' <EXPRESSION>
 
 <assignment> ::= <identifier> '=' <COMP_EXPRESSION>
                | <identifier>

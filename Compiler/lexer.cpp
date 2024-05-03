@@ -188,6 +188,15 @@ void Lexer::lex()
                 //Check if its '==' or simple '='
                 lex_this_or_eq_variation("=", "==", TOKEN_EQ, TOKEN_EEQ);
                 return;
+            //Ternary
+            case '?':
+                set_token("?", TOKEN_QUESTION);
+                advance();
+                return;
+            case ':':
+                set_token(":", TOKEN_COLON);
+                advance();
+                return;
             //,
             case ',':
                 set_token(",", TOKEN_COMMA);

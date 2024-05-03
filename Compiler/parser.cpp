@@ -74,10 +74,10 @@ ASTPtr Parser::parse_reassignment(TokenType var_type)
     if(!match_types(TOKEN_ID))
         printError("ParserError", "Expected identifier after type");
 
-    //Variable name should not clash with the existing names
+    //Variable name should exist
     std::string identifier = current_token.token_value;
-    if((temporary_symbol_table.find(identifier) != temporary_symbol_table.end()))
-        printError("ParserError", "Current variable: ", identifier, " already exists, use another name");
+    if((temporary_symbol_table.find(identifier) == temporary_symbol_table.end()))
+        printError("ParserError", "Current variable: ", identifier, " doesn't exist.");
 
     advance();
 
@@ -128,7 +128,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
             declarations.emplace_back(create_variable_assign_node(
                     var_type, identifier, create_value_node(Token("0", keyword_to_primitive_type.at(var_type)))));
         }
-        //We found '=' symbol   
+        //We found '=' symbol
         else
         {
             advance();
@@ -251,8 +251,30 @@ ASTPtr Parser::parse_expr()
             return parse_variable(elem->second, true);
         }
     }
+    
+    auto expr = common_binary_op(std::bind(parse_comp_expr, this), TOKEN_AND, TOKEN_OR, std::bind(parse_comp_expr, this));
+    
+    //we can now check for Ternary operation, if we have a '?' token
+    if(match_types(TOKEN_QUESTION))
+    {
+        advance();
+        //Get the true condition expression
+        auto true_expr = parse_expr();
 
-    return common_binary_op(std::bind(parse_comp_expr, this), TOKEN_AND, TOKEN_OR, std::bind(parse_comp_expr, this));
+        //Look for ':'
+        if(!match_types(TOKEN_COLON))
+            printError("ParserError", "Expected ':' after expression");
+
+        advance();
+        //Get the false condition expression
+        auto false_expr = parse_expr();
+
+        //now return Ternary Operation
+        return create_ternary_op_node(std::move(expr), std::move(true_expr), std::move(false_expr));
+    }
+
+    //Not a ternary expression
+    return expr;
 }
 
 //! expression or arith_expr along with  
@@ -393,6 +415,11 @@ ASTPtr Parser::create_cast_dummy_node(TokenType eval_type, ASTPtr&& expr)
 ASTPtr Parser::create_block_node(std::vector<ASTPtr>&& statements)
 {
     return std::make_unique<ASTBlock>(std::move(statements));
+}
+
+ASTPtr Parser::create_ternary_op_node(ASTPtr&& condition, ASTPtr&& true_expr, ASTPtr&& false_expr)
+{
+    return std::make_unique<ASTTernaryOp>(std::move(condition), std::move(true_expr), std::move(false_expr)); 
 }
 
 //-----------------ACTUALLY Helper functions-----------------

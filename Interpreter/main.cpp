@@ -15,7 +15,7 @@ int main(int argc, char** argv)
     auto start = std::chrono::high_resolution_clock::now();
 
     ByteCodeInterpreter bct{argv[1]};
-    bct.readFromFile();
+    bct.interpret();
 
     //End of Compilation
     auto end = std::chrono::high_resolution_clock::now();

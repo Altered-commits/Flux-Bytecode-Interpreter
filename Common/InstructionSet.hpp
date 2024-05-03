@@ -2,6 +2,7 @@
 #define UNNAMED_INST_SET
 
 #include <cstdint>
+#include <string>
 
 enum ILInstruction : std::uint8_t
 {
@@ -39,8 +40,10 @@ enum ILInstruction : std::uint8_t
     AND,
     OR,
     NOT,
+    //Jump operations
+    JUMP_IF_FALSE,
+    JUMP,
     //EOF
     END_OF_FILE
 };
-
 #endif

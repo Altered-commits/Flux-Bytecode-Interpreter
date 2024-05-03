@@ -181,3 +181,36 @@ void ILGenerator::visit(ASTBlock& statements, bool is_sub_expr)
     for (auto &&expr : statements.getStatements())
         expr->accept(*this, is_sub_expr);
 }
+
+//Painful ternary op ;-;
+//Depending on condition, we either jump or just execute below expression ig
+void ILGenerator::visit(ASTTernaryOp& ternary_node, bool is_sub_expr)
+{
+    //Generate condition
+    ternary_node.condition->accept(*this, true);
+
+    //Store the location of Jump instruction
+    il_code.emplace_back(ILInstruction::JUMP_IF_FALSE); //Later we will update the operand as well
+    std::size_t false_expr_jump_location = il_code.size() - 1;
+    std::cout << "JUMP_IF_FALSE FLOC\n";
+
+    //Generate true expression
+    ternary_node.true_expr->accept(*this, true);
+    //After executing true expression, we need to JUMP the entire expression (false expression)
+
+    il_code.emplace_back(ILInstruction::JUMP); // we will also update the operand as well later
+    std::size_t expr_jump_location = il_code.size() - 1;
+    std::cout << "JUMP ELOC\n";
+
+    //Generate false expression
+    ternary_node.false_expr->accept(*this, true);
+
+    //now that everything is generated, we are going to be updating jump locations
+    //First: Jump to False Expression
+    il_code[false_expr_jump_location].operand = std::to_string(expr_jump_location + 1);
+    
+    //Second: Jump entire expression
+    il_code[expr_jump_location].operand = std::to_string(il_code.size());
+
+    std::cout << "FLOC: " << expr_jump_location + 1 << " ELOC: " << il_code.size() << '\n';
+}
