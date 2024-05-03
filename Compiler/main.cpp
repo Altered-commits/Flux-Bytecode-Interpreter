@@ -34,7 +34,7 @@ int main(int argc, char** argv)
     //Parsing Stage
     Parser parser{language.str()};
     auto& tree = parser.parse();
-    
+
     //Intermediate Language Stage
     ILGenerator ilgen{std::move(tree)};
     auto& gen_code = ilgen.generateIL();

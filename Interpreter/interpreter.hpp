@@ -35,9 +35,13 @@ class ByteCodeInterpreter {
             }
         }
 
+        void interpret();
+
+    private:
         void decodeFile();
         void interpretInstructions();
-        void interpret();
+    
+    private:
         void handleUnaryArithmetic();
         void handleIntegerArithmetic(ILInstruction);
         void handleFloatingArithmetic(ILInstruction);
@@ -45,12 +49,11 @@ class ByteCodeInterpreter {
         void handleVariableAccess(const std::string&);
         void handleCasting(ILInstruction);
         void handleComparisionAndLogical(ILInstruction);
-
         //Jump
         void handleJumpIfFalse(std::size_t);
         void handleJump(std::size_t);
     
-    private:
+    private: //Helper functions
         std::string& readStringFromFile();
         
         template<typename T, typename U>
@@ -59,7 +62,7 @@ class ByteCodeInterpreter {
         void pushInstructionValue(const InstructionValue&);
     private:
         std::vector<Instruction> instructions;
-        std::string   currentVariable;
-        std::ifstream inFile;
+        std::string              currentVariable;
+        std::ifstream            inFile;
 };
 #endif

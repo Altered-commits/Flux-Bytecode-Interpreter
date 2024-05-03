@@ -2,7 +2,6 @@
 #define UNNAMED_INST_SET
 
 #include <cstdint>
-#include <string>
 
 enum ILInstruction : std::uint8_t
 {

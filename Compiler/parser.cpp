@@ -76,7 +76,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type)
 
     //Variable name should exist
     std::string identifier = current_token.token_value;
-    if((temporary_symbol_table.find(identifier) == temporary_symbol_table.end()))
+    if(get_variable_from_symbol_table(identifier) == TOKEN_UNKNOWN)
         printError("ParserError", "Current variable: ", identifier, " doesn't exist.");
 
     advance();
@@ -94,7 +94,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type)
     if(keyword_to_primitive_type.at(var_type) == expr_type)
     {
         //Add it to symbol table and create AST
-        temporary_symbol_table[identifier] = var_type;
+        add_variable_to_symbol_table(identifier, var_type);
         return create_variable_assign_node(var_type, identifier, std::move(var_expr));
     }
     //Oops, types dont match, errrorrrrr!
@@ -115,7 +115,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
 
         //Variable name should not clash with the existing names
         std::string identifier = current_token.token_value;
-        if((temporary_symbol_table.find(identifier) != temporary_symbol_table.end()))
+        if(get_variable_from_symbol_table(identifier) != TOKEN_UNKNOWN)
             printError("ParserError", "Current variable: ", identifier, " already exists, use another name");
 
         advance();
@@ -123,7 +123,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
         //Check for Equals symbol, if not found, we assuming its like Int a; initialize the value to 0
         if(!match_types(TOKEN_EQ))
         {
-            temporary_symbol_table[identifier] = var_type;
+            add_variable_to_symbol_table(identifier, var_type);
             //Yeah its a bit hard to understand but uhh yeah
             declarations.emplace_back(create_variable_assign_node(
                     var_type, identifier, create_value_node(Token("0", keyword_to_primitive_type.at(var_type)))));
@@ -140,7 +140,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
             if(keyword_to_primitive_type.at(var_type) == expr_type)
             {
                 //Add it to symbol table and create AST
-                temporary_symbol_table[identifier] = var_type;
+                add_variable_to_symbol_table(identifier, var_type);
                 declarations.emplace_back(create_variable_assign_node(var_type, identifier, std::move(var_expr)));
             }
             else
@@ -244,11 +244,11 @@ ASTPtr Parser::parse_expr()
     {
         if(peek().token_type == TOKEN_EQ)
         {
-            auto elem = temporary_symbol_table.find(current_token.token_value);
-            if(elem == temporary_symbol_table.end())
+            auto type = get_variable_from_symbol_table(current_token.token_value);
+            if(type == TOKEN_UNKNOWN)
                 printError("ParserError", "Undefined variable: ", current_token.token_value);
 
-            return parse_variable(elem->second, true);
+            return parse_variable(type, true);
         }
     }
     
@@ -343,11 +343,13 @@ ASTPtr Parser::parse_atom()
         //Variable getter
         case TOKEN_ID:
         {
-            auto elem = temporary_symbol_table.find(current_token.token_value);
-            if(elem != temporary_symbol_table.end())
+            auto type = get_variable_from_symbol_table(current_token.token_value);
+            if(type != TOKEN_UNKNOWN)
             {
+                //We need the proper string value
+                auto expr = create_variable_access_node(type, current_token.token_value);
                 advance();
-                return create_variable_access_node(elem->second, elem->first);
+                return expr;
             }
             else
                 printError("ParserError", "Undefined variable: ", current_token.token_value);
@@ -437,4 +439,32 @@ Token Parser::peek()
 bool Parser::match_types(TokenType type)
 {
     return current_token.token_type == type;
+}
+//Scope management
+void Parser::add_variable_to_symbol_table(const std::string& id, TokenType type)
+{
+    //Get the top most symbol table and 
+    temporary_symbol_table.back()[id] = type;
+}
+
+TokenType Parser::get_variable_from_symbol_table(const std::string& id)
+{
+    for (auto it = temporary_symbol_table.rbegin(); it != temporary_symbol_table.rend(); ++it) {
+        if (it->count(id)) {
+            return (*it)[id];
+        }
+    }
+    return TOKEN_UNKNOWN;
+}
+
+void Parser::create_scope()
+{
+    //Create and push a scope
+    temporary_symbol_table.push_back({});    
+}
+
+void Parser::destroy_scope()
+{
+    //Pop the scope
+    temporary_symbol_table.pop_back();
 }
