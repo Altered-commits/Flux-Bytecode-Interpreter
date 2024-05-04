@@ -100,12 +100,22 @@ void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst, const std
     //Before pushing it to symbol table, pop the stack to get evaluated expression
     auto elem = globalStack.top();
 
-    //Depending on the instruction, we either pop or dont pop
-    if(inst != ASSIGN_VAR_NO_POP)
-        globalStack.pop();
+    switch (inst)
+    {
+        //If assign var: pop and assign, Else: assign
+        case ASSIGN_VAR:
+            globalStack.pop();
+        case ASSIGN_VAR_NO_POP:
+            setValueToTopFrame(identifier, elem);
+            break;
 
-    // and assign it to variable :D
-    setValueToSymbolTable(identifier, elem);
+        //Only difference, look the entire symbol table to set value
+        case REASSIGN_VAR:
+            globalStack.pop();
+        case REASSIGN_VAR_NO_POP:
+            setValueToNthFrame(identifier, elem);
+            break;
+    }
 }
 
 void ByteCodeInterpreter::handleVariableAccess(const std::string& identifier)
@@ -201,6 +211,8 @@ void ByteCodeInterpreter::decodeFile()
             //Variable assignment / accessing
             case ILInstruction::ASSIGN_VAR:
             case ILInstruction::ASSIGN_VAR_NO_POP:
+            case ILInstruction::REASSIGN_VAR:
+            case ILInstruction::REASSIGN_VAR_NO_POP:
             case ILInstruction::ACCESS_VAR:
                 instructions.emplace_back(inst, std::move(readStringFromFile()));
                 break;
@@ -280,6 +292,8 @@ void ByteCodeInterpreter::interpretInstructions()
             //Assignment
             case ILInstruction::ASSIGN_VAR:
             case ILInstruction::ASSIGN_VAR_NO_POP:
+            case ILInstruction::REASSIGN_VAR:
+            case ILInstruction::REASSIGN_VAR_NO_POP:
                 handleVariableAssignment(i.inst, std::get<std::string>(i.value));
                 break;
             
@@ -323,7 +337,7 @@ void ByteCodeInterpreter::interpretInstructions()
 
 void ByteCodeInterpreter::interpret()
 {
-    //Initialize global symbol table with one layer / global layer
+    //Initialize global symbol table with one frame / global frame
     globalSymbolTable.push_back({});
 
     //Decode and execute instructions
@@ -413,7 +427,17 @@ Object ByteCodeInterpreter::getValueFromSymbolTable(const std::string& id)
     }
 }
 
-void ByteCodeInterpreter::setValueToSymbolTable(const std::string& id, Object elem)
+void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object elem)
 {
     globalSymbolTable.back()[id] = elem;
+}
+
+void ByteCodeInterpreter::setValueToNthFrame(const std::string& id, Object elem)
+{
+    for (auto it = globalSymbolTable.rbegin(); it != globalSymbolTable.rend(); ++it) {
+        if (it->count(id)) {
+            (*it)[id] = elem;
+            break;
+        }
+    }
 }

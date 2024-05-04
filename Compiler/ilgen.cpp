@@ -144,12 +144,14 @@ void ILGenerator::visit(ASTVariableAssign& var_assign_node, bool is_sub_expr)
     switch (is_sub_expr)
     {
         case true:
-            std::cout << "ASSIGN_VAR_NO_POP " << var_assign_node.identifier << '\n';
-            inst = ILInstruction::ASSIGN_VAR_NO_POP;
+            var_assign_node.is_reassignment ? std::cout << "REASSIGN_VAR_NO_POP " << var_assign_node.identifier << '\n'
+                                            : std::cout << "ASSIGN_VAR_NO_POP " << var_assign_node.identifier << '\n';
+            inst = var_assign_node.is_reassignment ? ILInstruction::REASSIGN_VAR_NO_POP : ILInstruction::ASSIGN_VAR_NO_POP;
             break;
         case false:
-            std::cout << "ASSIGN_VAR " << var_assign_node.identifier << '\n';
-            inst = ILInstruction::ASSIGN_VAR;
+            var_assign_node.is_reassignment ? std::cout << "REASSIGN_VAR " << var_assign_node.identifier << '\n'
+                                            : std::cout << "ASSIGN_VAR " << var_assign_node.identifier << '\n';
+            inst = var_assign_node.is_reassignment ? ILInstruction::REASSIGN_VAR : ILInstruction::ASSIGN_VAR;
             break;
     }
     //Depending on whether the variable is a sub expression, we either pop and assign value,

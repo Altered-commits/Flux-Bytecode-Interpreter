@@ -46,7 +46,7 @@ class Parser
         ASTPtr create_value_node(const Token&);
         ASTPtr create_binary_op_node(TokenType, ASTPtr&&, ASTPtr&&);
         ASTPtr create_unary_op_node(TokenType, ASTPtr&&);
-        ASTPtr create_variable_assign_node(TokenType, const std::string&, ASTPtr&&);
+        ASTPtr create_variable_assign_node(TokenType, const std::string&, ASTPtr&&, bool);
         ASTPtr create_variable_access_node(TokenType, const std::string&);
         ASTPtr create_cast_dummy_node(TokenType, ASTPtr&&);
         ASTPtr create_block_node(std::vector<ASTPtr>&&);

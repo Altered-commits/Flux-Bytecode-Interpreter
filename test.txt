@@ -3,9 +3,9 @@ Float b = 10.0;
 If(a == 10.4)
 {
     Int c = 9;
-    Float b = 9.04;
+    b = Cast<Float>(c);
 }
 Else {
-    b = 0.0;
+    b = 5.0;
 }
 b;

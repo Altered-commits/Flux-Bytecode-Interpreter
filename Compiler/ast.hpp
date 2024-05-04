@@ -163,10 +163,10 @@ struct ASTVariableAssign : public ASTNode
     std::string identifier;
     ASTPtr      expr;
     TokenType   var_type;
-    bool        should_return_value;
+    bool        is_reassignment;
 
-    ASTVariableAssign(const std::string& identifier, TokenType type, ASTPtr&& expr, bool srv = false)
-        : identifier(identifier), var_type(type), expr(std::move(expr)), should_return_value(srv)
+    ASTVariableAssign(const std::string& identifier, TokenType type, ASTPtr&& expr, bool is_reassignment)
+        : identifier(identifier), var_type(type), expr(std::move(expr)), is_reassignment(is_reassignment)
     {}
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {

@@ -160,7 +160,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type)
     {
         //Add it to symbol table and create AST
         add_variable_to_symbol_table(identifier, var_type);
-        return create_variable_assign_node(var_type, identifier, std::move(var_expr));
+        return create_variable_assign_node(var_type, identifier, std::move(var_expr), true);
     }
     //Oops, types dont match, errrorrrrr!
     printError("ParserError", "Evaluated expression type doesn't match the type pre-assigned to variable: ", identifier);
@@ -171,7 +171,6 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
     std::vector<ASTPtr> declarations;
     //We check for multiple variables to assign for
     //Type identifier, identifier = expr, identifier;
-    //What i can do is, each of it, i can just push it as a statement to statements vector
     while(true)
     {
         //Grab the identifier
@@ -190,8 +189,9 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
         {
             add_variable_to_symbol_table(identifier, var_type);
             //Yeah its a bit hard to understand but uhh yeah
+            //Bro the compiler is useless, even tho i declared last arg to default to false, it still expects me to put value
             declarations.emplace_back(create_variable_assign_node(
-                    var_type, identifier, create_value_node(Token("0", keyword_to_primitive_type.at(var_type)))));
+                    var_type, identifier, create_value_node(Token("0", keyword_to_primitive_type.at(var_type))), false));
         }
         //We found '=' symbol
         else
@@ -206,7 +206,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
             {
                 //Add it to symbol table and create AST
                 add_variable_to_symbol_table(identifier, var_type);
-                declarations.emplace_back(create_variable_assign_node(var_type, identifier, std::move(var_expr)));
+                declarations.emplace_back(create_variable_assign_node(var_type, identifier, std::move(var_expr), false));
             }
             else
                 //Oops, types dont match, errrorrrrr!
@@ -492,9 +492,9 @@ ASTPtr Parser::create_unary_op_node(TokenType op_type, ASTPtr&& expr)
     return std::make_unique<ASTUnaryOp>(op_type, std::move(expr));
 }
 
-ASTPtr Parser::create_variable_assign_node(TokenType var_type, const std::string& identifier, ASTPtr&& var_expr)
+ASTPtr Parser::create_variable_assign_node(TokenType var_type, const std::string& identifier, ASTPtr&& var_expr, bool is_reassignment)
 {
-    return std::make_unique<ASTVariableAssign>(identifier, var_type, std::move(var_expr));
+    return std::make_unique<ASTVariableAssign>(identifier, var_type, std::move(var_expr), is_reassignment);
 }
 
 ASTPtr Parser::create_variable_access_node(TokenType var_type, const std::string& identifier)

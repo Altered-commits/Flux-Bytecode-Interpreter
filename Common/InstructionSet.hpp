@@ -24,6 +24,9 @@ enum ILInstruction : std::uint8_t
     //Variable instructions
     ASSIGN_VAR,
     ASSIGN_VAR_NO_POP,
+    //Having to add alot more instructions cuz im a bad coder
+    REASSIGN_VAR,
+    REASSIGN_VAR_NO_POP,
     ACCESS_VAR,
     //Casting instruction
     CAST_INT,

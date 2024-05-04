@@ -32,6 +32,8 @@ void FileWriter::writeToFile(const std::vector<ILCommand> &commands)
                 case ACCESS_VAR:
                 case ASSIGN_VAR:
                 case ASSIGN_VAR_NO_POP:
+                case REASSIGN_VAR:
+                case REASSIGN_VAR_NO_POP:
                     writeStringToFile(cmd.operand);
                     break;
                 
