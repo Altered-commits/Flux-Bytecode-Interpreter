@@ -65,7 +65,9 @@ class Lexer
             {"Cast", TOKEN_KEYWORD_CAST},
             {"If", TOKEN_KEYWORD_IF},
             {"Elif", TOKEN_KEYWORD_ELIF},
-            {"Else", TOKEN_KEYWORD_ELSE}
+            {"Else", TOKEN_KEYWORD_ELSE},
+            {"For", TOKEN_KEYWORD_FOR},
+            {"in", TOKEN_KEYWORD_IN},
         };
 
 };

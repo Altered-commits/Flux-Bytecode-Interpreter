@@ -3,6 +3,13 @@
 
 #include <cstdint>
 
+//----------------------ITERATORS TYPES----------------------
+enum IteratorType : std::uint8_t
+{
+    RANGE_ITERATOR
+};
+
+//----------------------INSTRUCTIONS TYPES----------------------
 enum ILInstruction : std::uint8_t
 {
     PUSH_INT,
@@ -45,6 +52,12 @@ enum ILInstruction : std::uint8_t
     //Jump operations
     JUMP_IF_FALSE,
     JUMP,
+    //Iteration operations
+    ITER_PRE_INIT,
+    ITER_INIT,
+    ITER_HAS_NEXT,
+    ITER_NEXT,
+    ITER_CURRENT,
     //Scope symbol table related operation
     CREATE_SYMBOL_TABLE,
     DESTROY_SYMBOL_TABLE,

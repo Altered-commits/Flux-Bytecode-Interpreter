@@ -4,9 +4,13 @@
 #include <memory>
 #include <string>
 #include "token.hpp"
+#include "error_printer.hpp"
 
+//Forward declare cuz the below std::unique_ptr is going to cry if not done
 struct ASTNode;
-using  ASTPtr = std::unique_ptr<ASTNode>;
+
+using ASTPtr    = std::unique_ptr<ASTNode>;
+using ASTRawPtr = ASTNode*;
 
 //BTW, this may look useless right now but trust me its important for same precedence operators
 constexpr size_t comparisionTypeMask = (1ULL << static_cast<std::size_t>(TOKEN_EEQ))
@@ -19,6 +23,15 @@ constexpr size_t comparisionTypeMask = (1ULL << static_cast<std::size_t>(TOKEN_E
 //Used for comparing token type in a type mask
 #define SAME_PRECEDENCE_MASK_CHECK(token, mask) (((1ULL << static_cast<std::size_t>(token)) & mask))
 
+//Some enums for Compile time evaluation
+enum class CTType {
+    NA,
+    Value,
+    Binary,
+    Unary,
+    VarAccess
+};
+
 //For the visitor pattern, we need to forward declare all the nodes, here we go
 struct ASTValue;
 struct ASTBinaryOp;
@@ -29,6 +42,8 @@ struct ASTCastDummy;
 struct ASTBlock;
 struct ASTTernaryOp;
 struct ASTIfNode;
+struct ASTRangeIterator;
+struct ASTForNode;
 
 //We will be using the -> Visitor Pattern
 //--------Visitor interface--------
@@ -46,6 +61,8 @@ class ASTVisitorInterface
         virtual void visit(ASTBlock& node, bool)          = 0;
         virtual void visit(ASTTernaryOp& node, bool)      = 0;
         virtual void visit(ASTIfNode& node, bool)         = 0;
+        virtual void visit(ASTRangeIterator& node, bool)  = 0;
+        virtual void visit(ASTForNode& node, bool)        = 0;
 };
 
 //AST nodes
@@ -60,10 +77,15 @@ struct ASTNode
     virtual bool isFloat() const = 0;
     virtual bool isPowerOp() const = 0;
 
-    //Expression evaluation for final type (variables)
+    //Think of it as a tag for each type
+    virtual CTType getType() const { return CTType::NA; }
+
+    //Expression evaluation for final type (variables and range)
     virtual TokenType evaluateExprType() const = 0;
+    virtual TokenType evaluateIterType() const { return TOKEN_UNKNOWN; }
 };
 
+//-----------------------------AST Types-----------------------------
 struct ASTValue : public ASTNode
 {
     TokenType   type;
@@ -86,6 +108,11 @@ struct ASTValue : public ASTNode
 
     TokenType evaluateExprType() const override {
         return type;
+    }
+
+    //Tag
+    CTType getType() const override {
+        return CTType::Value;
     }
 };
 
@@ -129,6 +156,11 @@ struct ASTBinaryOp : public ASTNode
 
         return TOKEN_INT;
     }
+
+    //Tag
+    CTType getType() const override {
+        return CTType::Binary;
+    }
 };
 
 struct ASTUnaryOp : public ASTNode
@@ -155,6 +187,11 @@ struct ASTUnaryOp : public ASTNode
         if(op_type == TOKEN_NOT)
             return TOKEN_INT;
         return expr->evaluateExprType();
+    }
+
+    //Tag
+    CTType getType() const override {
+        return CTType::Unary;
     }
 };
 
@@ -207,6 +244,11 @@ struct ASTVariableAccess : public ASTNode
 
     TokenType evaluateExprType() const override {
         return var_type == TOKEN_KEYWORD_FLOAT ? TOKEN_FLOAT : TOKEN_INT;
+    }
+
+    //Tag
+    CTType getType() const override {
+        return CTType::VarAccess;
     }
 };
 
@@ -308,6 +350,78 @@ struct ASTIfNode : ASTNode
 
     ASTIfNode(ASTPtr&& ifc, ASTPtr&& ifb, std::vector<std::pair<ASTPtr, ASTPtr>>&& elfc, ASTPtr&& eb = nullptr)
         : if_condition(std::move(ifc)), if_body(std::move(ifb)), elif_clauses(std::move(elfc)), else_body(std::move(eb))
+    {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+
+    bool isFloat() const override {
+        return false;
+    }
+    bool isPowerOp() const override {
+        return false;
+    }
+
+    TokenType evaluateExprType() const override {
+        return TOKEN_UNKNOWN;
+    }
+};
+
+//--------------ITERATORS--------------
+struct ASTBaseIterator : public ASTNode
+{
+    std::string iter_identifier;
+
+    virtual ~ASTBaseIterator() = default;
+};
+
+//Range can be used for stuff like lists, for loop etc
+struct ASTRangeIterator : public ASTBaseIterator
+{
+    //The way i want it is, start..stop..step, also it can be a binary expression so yeah
+    ASTPtr start, stop, step;
+    //0 is condition, 1 is construction (should range be used as condition or to contruct something)
+    bool condition_or_construction = 0;
+
+    ASTRangeIterator(ASTPtr&& start, ASTPtr&& stop, ASTPtr&& step, const std::string& iter_id, bool coc) //coc lmfao
+        : start(std::move(start)), stop(std::move(stop)), step(std::move(step)), condition_or_construction(coc)
+    {
+        iter_identifier = iter_id;
+    }
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+
+    bool isFloat() const override {
+        return false;
+    }
+    bool isPowerOp() const override {
+        return false;
+    }
+
+    TokenType evaluateExprType() const override {
+        return TOKEN_RANGE_ITER;
+    }
+
+    TokenType evaluateIterType() const override {
+        TokenType tsr = start->evaluateExprType();
+        TokenType tso = stop->evaluateExprType();
+
+        return (tsr == TOKEN_FLOAT || tso == TOKEN_FLOAT) ? TOKEN_FLOAT : TOKEN_INT;
+    }
+};
+
+//--------------LOOPS--------------
+struct ASTForNode : public ASTNode
+{
+    std::string id;
+    ASTPtr      range;
+    ASTPtr      for_body;
+
+    ASTForNode(const std::string& id, ASTPtr&& range, ASTPtr&& for_body)
+        : id(id), range(std::move(range)), for_body(std::move(for_body))
     {}
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {

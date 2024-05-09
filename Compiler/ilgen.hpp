@@ -9,7 +9,7 @@
 
 #include "ast.hpp"
 #include "error_printer.hpp"
-#include "..\Common\InstructionSet.hpp"
+#include "..\Common\common.hpp"
 
 struct ILCommand
 {
@@ -37,8 +37,10 @@ class ILGenerator : public ASTVisitorInterface {
         void visit(ASTVariableAccess&, bool);
         void visit(ASTCastDummy&, bool);
         void visit(ASTBlock&, bool);
+        void visit(ASTRangeIterator&, bool);
         void visit(ASTTernaryOp&, bool);
         void visit(ASTIfNode&, bool);
+        void visit(ASTForNode&, bool);
 
     private:
         std::vector<ASTPtr>    ast_statements;

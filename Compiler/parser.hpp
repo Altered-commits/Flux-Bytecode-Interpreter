@@ -4,6 +4,7 @@
 #include <functional>
 #include <unordered_map>
 #include <vector>
+#include <cmath>
 
 #include "lexer.hpp"
 #include "ast.hpp"
@@ -34,6 +35,9 @@ class Parser
     
     private:
         ASTPtr parse_if_condition();
+        ASTPtr parse_for_loop();
+        ASTPtr parse_iterator(const std::string&);
+        ASTPtr parse_range_iterator(const std::string&, bool);
         ASTPtr parse_block();
         ASTPtr parse_cast();
         ASTPtr parse_variable(TokenType, bool);
@@ -52,14 +56,22 @@ class Parser
         ASTPtr create_block_node(std::vector<ASTPtr>&&);
         ASTPtr create_ternary_op_node(ASTPtr&&, ASTPtr&&, ASTPtr&&);
         ASTPtr create_if_node(ASTPtr&&, ASTPtr&&, std::vector<std::pair<ASTPtr, ASTPtr>>&&, ASTPtr&&);
+        ASTPtr create_range_iter_node(ASTPtr&&, ASTPtr&&, ASTPtr&&, const std::string&, bool);
+        ASTPtr create_for_node(const std::string&, ASTPtr&&, ASTPtr&&);
 
     //Scope
     private:
-        void      add_variable_to_symbol_table(const std::string&, TokenType);
-        TokenType get_variable_from_symbol_table(const std::string&);
-        bool      find_variable_from_current_scope(const std::string&);
-        void      create_scope();
-        void      destroy_scope();
+        void        set_value_to_symbol_table(const std::string&, const ASTPtr&, TokenType);
+        TokenType   get_type_from_symbol_table(const std::string&);
+        ASTRawPtr   get_expr_from_symbol_table(const std::string&);
+        bool        find_variable_from_current_scope(const std::string&);
+        void        create_scope();
+        void        destroy_scope();
+
+    //Compile time Evaluator
+    private:
+        template<typename RV>
+        constexpr RV preEvaluateAST(const ASTNode&);
 
     private:
         void  advance();
@@ -72,12 +84,17 @@ class Parser
 
         std::vector<ASTPtr> statements;
         //Temporary symbol table for variables, stack based scoping mechanism
-        std::vector<std::unordered_map<std::string, TokenType>> temporary_symbol_table;
+        std::vector<std::unordered_map<std::string, std::pair<ASTRawPtr, TokenType>>> temporary_symbol_table;
 
         //Keyword to primitive type mapper, cuz i dont know how to properly optimize and code
         const std::unordered_map<TokenType, TokenType> keyword_to_primitive_type = {
             {TOKEN_KEYWORD_FLOAT, TOKEN_FLOAT},
             {TOKEN_KEYWORD_INT, TOKEN_INT},
+        };
+        //Primitive to keyword mapper cuz i again dont know how to code
+        const std::unordered_map<TokenType, TokenType> primitive_to_keyword_type = {
+            {TOKEN_FLOAT, TOKEN_KEYWORD_FLOAT},
+            {TOKEN_INT, TOKEN_KEYWORD_INT},
         };
 };
 

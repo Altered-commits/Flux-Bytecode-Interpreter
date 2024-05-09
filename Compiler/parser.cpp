@@ -6,7 +6,7 @@ std::vector<ASTPtr>& Parser::parse()
     while(lex.get_current_token().token_type != TOKEN_EOF)
     {
         auto res = parse_statement();
-        
+
         statements.push_back(std::move(res));
     }
 
@@ -66,9 +66,104 @@ ASTPtr Parser::parse_if_condition()
     return create_if_node(std::move(if_condition), std::move(if_body), std::move(elif_clauses), std::move(else_block));
 }
 
+ASTPtr Parser::parse_for_loop()
+{
+    //Look for an identifier
+    std::string id = current_token.token_value;
+    if(!match_types(TOKEN_ID))
+        printError("ParserError", "Expected identifier after 'For'");
+    
+    advance();
+    //Look for 'in' keyword
+    if(!match_types(TOKEN_KEYWORD_IN))
+        printError("ParserError", "Expected 'in' keyword after identifier");
+    
+    advance();
+
+    //Get iterator
+    auto range = parse_iterator(id);
+
+    //Add the for identifier to symbol table with the evaluated type of range
+    set_value_to_symbol_table(id, range, primitive_to_keyword_type.at(range->evaluateIterType()));
+
+    //Now look for code block as usual
+    auto for_body = parse_block();
+
+    //Thats it return node
+    return create_for_node(id, std::move(range), std::move(for_body));
+}
+
+ASTPtr Parser::parse_iterator(const std::string& iter_id)
+{
+    //Right now there is only 1 iterator, that is RangeIterator, just return it for now
+    return parse_range_iterator(iter_id, 0);
+}
+
+ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_or_construction)
+{
+    //Look for start..stop..step || start : stop : step
+    TokenType range_split_token;
+    //All of them are basic binary expressions
+    ASTPtr start = parse_arith_expr();
+
+    //.. || :
+    if((!match_types(TOKEN_RANGE)) && (!match_types(TOKEN_COLON)))
+        printError("ParserError", "Range expected '..' or ':' after 'start' expression");
+    
+    range_split_token = current_token.token_type;
+    advance();
+
+    ASTPtr stop = parse_arith_expr();
+
+    //Step is optional
+    ASTPtr step = nullptr;
+    if(match_types(range_split_token))
+    {
+        advance();
+        step = parse_arith_expr();
+    }
+    
+    //If step is nullptr, do this: if expr is floating (either start or stop), we do complex stuff
+    //                             else we take 1 or -1 as step
+    if(step == nullptr)
+    {
+        if(start->evaluateExprType() == TOKEN_INT && stop->evaluateExprType() == TOKEN_INT)
+        {
+            int eval_start = preEvaluateAST<int>(*start);
+            int eval_stop  = preEvaluateAST<int>(*stop);
+
+            //If we are evaluating, might as well use this value instead of whole ass tree
+            start = create_value_node(Token(std::to_string(eval_start).c_str(), TOKEN_INT));
+            stop  = create_value_node(Token(std::to_string(eval_stop).c_str(), TOKEN_INT));
+
+            step = std::move(create_value_node(Token(eval_start < eval_stop ? "1" : "-1", TOKEN_INT)));
+        }
+        else {
+            float eval_start = preEvaluateAST<float>(*start);
+            float eval_stop  = preEvaluateAST<float>(*stop);
+
+            //Same here
+            start = create_value_node(Token(std::to_string(eval_start).c_str(), TOKEN_FLOAT));
+            stop  = create_value_node(Token(std::to_string(eval_stop).c_str(), TOKEN_FLOAT));
+
+            //Calculate the distance between two values
+            float diff = std::abs(eval_stop - eval_start);
+
+            //Yeah idk what all this does from here but uhh yeah this decently works
+            int order = std::floor(std::log10(diff));
+
+            float interval = 10.0f * std::pow(10, order-1);
+
+            step = std::move(create_value_node(Token(std::to_string(eval_start < eval_stop ? interval : -interval).c_str(), TOKEN_FLOAT)));
+        }
+    }
+
+    return create_range_iter_node(std::move(start), std::move(stop), std::move(step), iter_id, condition_or_construction);
+}
+
 ASTPtr Parser::parse_block()
 {
-    if(!match_types(TOKEN_LBRACE)) printError("ParserError", "Expected '{' after ')'");
+    if(!match_types(TOKEN_LBRACE)) printError("ParserError", "Expected '{' for statement");
     advance();
 
     std::vector<ASTPtr> statements;
@@ -79,7 +174,7 @@ ASTPtr Parser::parse_block()
         statements.emplace_back(std::move(statement));
     }
     
-    if(!match_types(TOKEN_RBRACE)) printError("ParserError", "Expected '}'");
+    if(!match_types(TOKEN_RBRACE)) printError("ParserError", "Expected '}' for statement");
     advance();
 
     return create_block_node(std::move(statements));
@@ -141,7 +236,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type)
 
     //Variable name should exist
     std::string identifier = current_token.token_value;
-    if(get_variable_from_symbol_table(identifier) == TOKEN_UNKNOWN)
+    if(get_type_from_symbol_table(identifier) == TOKEN_UNKNOWN)
         printError("ParserError", "Current variable: '", identifier, "' doesn't exist.");
 
     advance();
@@ -159,7 +254,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type)
     if(keyword_to_primitive_type.at(var_type) == expr_type)
     {
         //Add it to symbol table and create AST
-        add_variable_to_symbol_table(identifier, var_type);
+        set_value_to_symbol_table(identifier, var_expr, var_type);
         return create_variable_assign_node(var_type, identifier, std::move(var_expr), true);
     }
     //Oops, types dont match, errrorrrrr!
@@ -187,11 +282,13 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
         //Check for Equals symbol, if not found, we assuming its like Int a; initialize the value to 0
         if(!match_types(TOKEN_EQ))
         {
-            add_variable_to_symbol_table(identifier, var_type);
             //Yeah its a bit hard to understand but uhh yeah
-            //Bro the compiler is useless, even tho i declared last arg to default to false, it still expects me to put value
+            //Bro the compiler is useless af
             declarations.emplace_back(create_variable_assign_node(
                     var_type, identifier, create_value_node(Token("0", keyword_to_primitive_type.at(var_type))), false));
+            
+            //Now add it to symbol table ig
+            set_value_to_symbol_table(identifier, declarations.back(), var_type);
         }
         //We found '=' symbol
         else
@@ -205,7 +302,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
             if(keyword_to_primitive_type.at(var_type) == expr_type)
             {
                 //Add it to symbol table and create AST
-                add_variable_to_symbol_table(identifier, var_type);
+                set_value_to_symbol_table(identifier, var_expr, var_type);
                 declarations.emplace_back(create_variable_assign_node(var_type, identifier, std::move(var_expr), false));
             }
             else
@@ -309,6 +406,14 @@ ASTPtr Parser::parse_statement()
             destroy_scope();
         }
         break;
+        case TOKEN_KEYWORD_FOR:
+        {
+            advance();
+            create_scope();
+            function_return_value = parse_for_loop();
+            destroy_scope();
+        }
+        break;
         default:
             function_return_value = parse_expr();
             break;
@@ -317,7 +422,7 @@ ASTPtr Parser::parse_statement()
     //Semi colon only when some conditions aka ignore some keywords
     if(!(statement_type >= TOKEN_KEYWORD_IF
         && 
-        statement_type <= TOKEN_KEYWORD_ELSE))
+        statement_type <= TOKEN_KEYWORD_IN))
     {
         //If the expression makes sense, the user should also end it with a semicolon as well
         if(!match_types(TOKEN_SEMIC))
@@ -337,7 +442,7 @@ ASTPtr Parser::parse_expr()
     {
         if(peek().token_type == TOKEN_EQ)
         {
-            auto type = get_variable_from_symbol_table(current_token.token_value);
+            auto type = get_type_from_symbol_table(current_token.token_value);
             if(type == TOKEN_UNKNOWN)
                 printError("ParserError", "Undefined variable: ", current_token.token_value);
 
@@ -436,7 +541,7 @@ ASTPtr Parser::parse_atom()
         //Variable getter
         case TOKEN_ID:
         {
-            auto type = get_variable_from_symbol_table(current_token.token_value);
+            auto type = get_type_from_symbol_table(current_token.token_value);
             if(type != TOKEN_UNKNOWN)
             {
                 //We need the proper string value
@@ -507,6 +612,11 @@ ASTPtr Parser::create_cast_dummy_node(TokenType eval_type, ASTPtr&& expr)
     return std::make_unique<ASTCastDummy>(eval_type, std::move(expr));
 }
 
+ASTPtr Parser::create_range_iter_node(ASTPtr&& start, ASTPtr&& stop, ASTPtr&& step, const std::string& iter_id, bool condition_or_construction)
+{
+    return std::make_unique<ASTRangeIterator>(std::move(start), std::move(stop), std::move(step), iter_id, condition_or_construction);
+}
+
 ASTPtr Parser::create_block_node(std::vector<ASTPtr>&& statements)
 {
     return std::make_unique<ASTBlock>(std::move(statements));
@@ -520,6 +630,11 @@ ASTPtr Parser::create_ternary_op_node(ASTPtr&& condition, ASTPtr&& true_expr, AS
 ASTPtr Parser::create_if_node(ASTPtr&& if_cond, ASTPtr&& if_body, std::vector<std::pair<ASTPtr, ASTPtr>>&& elif_clauses, ASTPtr&& else_body)
 {
     return std::make_unique<ASTIfNode>(std::move(if_cond), std::move(if_body), std::move(elif_clauses), std::move(else_body));
+}
+
+ASTPtr Parser::create_for_node(const std::string& id, ASTPtr&& range, ASTPtr&& for_body)
+{
+    return std::make_unique<ASTForNode>(id, std::move(range), std::move(for_body));
 }
 
 //-----------------ACTUALLY Helper functions-----------------
@@ -539,20 +654,31 @@ bool Parser::match_types(TokenType type)
     return current_token.token_type == type;
 }
 //Scope management
-void Parser::add_variable_to_symbol_table(const std::string& id, TokenType type)
+void Parser::set_value_to_symbol_table(const std::string& id, const ASTPtr& expr, TokenType ttype)
 {
     //Get the top most symbol table and 
-    temporary_symbol_table.back()[id] = type;
+    temporary_symbol_table.back()[id] = std::make_pair(expr.get(), ttype);
 }
 
-TokenType Parser::get_variable_from_symbol_table(const std::string& id)
+TokenType Parser::get_type_from_symbol_table(const std::string& id)
 {
     for (auto it = temporary_symbol_table.rbegin(); it != temporary_symbol_table.rend(); ++it) {
         if (it->count(id)) {
-            return (*it)[id];
+            return (*it)[id].second;
         }
     }
     return TOKEN_UNKNOWN;
+}
+
+//This variation is pretty much used for pre-evaluating expressions
+ASTRawPtr Parser::get_expr_from_symbol_table(const std::string& id)
+{
+    for (auto it = temporary_symbol_table.rbegin(); it != temporary_symbol_table.rend(); ++it) {
+        if (it->count(id)) {
+            return (*it)[id].first;
+        }
+    }
+    //This can't/shouldn't really fail, as this is used after creation of tree
 }
 
 bool Parser::find_variable_from_current_scope(const std::string& identifier)
@@ -570,4 +696,78 @@ void Parser::destroy_scope()
 {
     //Pop the scope
     temporary_symbol_table.pop_back();
+}
+
+//------------------CT EVALUATOR------------------
+// Evaluate AST node at compile time
+template<typename RV>
+constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
+    // Dispatch based on node type
+    switch (node.getType())
+    {
+        case CTType::Value:
+        {
+            auto value_node = static_cast<const ASTValue&>(node);
+
+            if (value_node.type == TOKEN_FLOAT) {
+                return std::stof(value_node.value); // Convert to float
+            } else {
+                return std::stoi(value_node.value); // Convert to integer
+            }
+        }
+        break;
+        case CTType::Binary:
+        {
+            const auto& binary_op_node = static_cast<const ASTBinaryOp&>(node);
+            
+            // For binary operations, recursively evaluate left and right sub-expressions
+            auto left = preEvaluateAST<RV>(*(binary_op_node.left));
+            auto right = preEvaluateAST<RV>(*(binary_op_node.right));
+
+            switch (binary_op_node.op_type)
+            {
+                case TOKEN_PLUS:
+                    return left + right;
+                case TOKEN_MINUS:
+                    return left - right;
+                case TOKEN_MULT:
+                    return left * right;
+                case TOKEN_DIV:
+                    if(right == 0)
+                        printError("CompileTimeError", "Division by zero error while pre-evaluating Binary expression");
+                    else
+                        return left / right;
+                case TOKEN_POW:
+                    return std::pow(left, right);
+                //Error
+                default:
+                    printError("CompileTimeError", "Unknown instruction found while pre-evaluating Binary expression");
+            }
+        }
+        case CTType::Unary:
+        {
+            const auto& unary_op_node = static_cast<const ASTUnaryOp&>(node);
+            
+            auto expr = preEvaluateAST<RV>(*(unary_op_node.expr));
+
+            switch(unary_op_node.op_type)
+            {
+                case TOKEN_PLUS:
+                    return expr;
+                case TOKEN_MINUS:
+                    return -expr;
+                default:
+                    printError("CompileTimeError", "Unknown instruction found while pre-evaluating Unary expression");
+            }
+        }
+        case CTType::VarAccess:
+        {
+            const auto& var_access_node = static_cast<const ASTVariableAccess&>(node);
+
+            //Retrieve the value of variable and recursively evaluate it (the tree)
+            return preEvaluateAST<RV>(*get_expr_from_symbol_table(var_access_node.identifier));
+        }
+        default:
+            printError("CompileTimeError", "Invalid node type found while pre-evaluating");
+    }
 }

@@ -39,10 +39,24 @@ void FileWriter::writeToFile(const std::vector<ILCommand> &commands)
                 
                 case JUMP_IF_FALSE:
                 case JUMP:
+                //Iter has next and next pretty much have same operands as jump instructions
+                case ITER_HAS_NEXT:
+                case ITER_NEXT:
                     {
                         auto offset = std::stoull(cmd.operand);
                         //Then write value to file
                         outFile.write(reinterpret_cast<Byte*>(&offset), sizeof(std::size_t));
+                    }
+                    break;
+                
+                case ITER_PRE_INIT:
+                    writeStringToFile(cmd.operand);
+                    break;
+                case ITER_INIT:
+                    {
+                        //specifically want a 16bit uint value
+                        std::uint16_t init_params = std::stoi(cmd.operand);
+                        outFile.write(reinterpret_cast<Byte*>(&init_params), sizeof(std::uint16_t));
                     }
                     break;
             }

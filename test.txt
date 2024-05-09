@@ -1,11 +1,14 @@
-Float a = 10.4;
-Float b = 10.0;
-If(a == 10.4)
-{
-    Int c = 9;
-    b = Cast<Float>(c);
+Float a = 2.0;
+Float b = 1.0;
+Float c = 5.1;
+ 
+For i in a + b .. c - b {
+    a = Cast<Float>(a + i);
 }
-Else {
-    b = 5.0;
+
+//Do the reverse of what was previously done, we go downhill ;-;
+For i in 0.9 .. -0.1 {
+    a = a - i;
 }
-b;
+
+a;

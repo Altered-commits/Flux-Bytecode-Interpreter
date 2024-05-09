@@ -46,34 +46,45 @@ void Lexer::skip_multi_line_comments()
 
 void Lexer::lex_digits()
 {
-    std::string  temp{};
-    std::uint8_t dot_count{0};
-
-    while (SANITY_CHECK(IS_DIGIT(cur_chr) || cur_chr == '.'))
-    {
-        if(cur_chr == '.')
-            dot_count += 1;
-
-        temp += cur_chr;
-        
+    char* start_pos = &text[cur_pos];
+    
+    //Look only for digits -> 0..9
+    while (SANITY_CHECK(IS_DIGIT(cur_chr)))
         advance();
+    
+    //When while loop breaks, it either hit '.' or some random character
+    //If its not '.', its an integer return it
+    if(cur_chr != '.')
+    {
+        set_token(std::string(start_pos, &text[cur_pos]), TOKEN_INT);
+        return;
     }
+    //But if it is a '.', make sure before lexing float, character after '.' is also not a dot
+    if(peek(1) != '.')
+    {    
+        //Otherwise, we are expecting a floating type -> 123.123, lex more digits
+        advance(); //Move past '.' as we are constructing string by pointers
 
-    if(dot_count > 1)
-        printError("LexerError", "Floating number can only have at max one '.', multiple '.' found");
-
-    set_token(temp, (dot_count == 0) ? TOKEN_INT : TOKEN_FLOAT);
+        while(SANITY_CHECK(IS_DIGIT(cur_chr)))
+            advance();
+        
+        //Set token as float
+        set_token(std::string(start_pos, &text[cur_pos]), TOKEN_FLOAT);
+        return;
+    }
+    //Else its '..' or some other character, return the current token as integer again
+    set_token(std::string(start_pos, &text[cur_pos]), TOKEN_INT);
 }
 
 void Lexer::lex_identifier_or_keyword()
 {
-    std::string temp{};
+    char* start_pos = &text[cur_pos];
 
     while(SANITY_CHECK(IS_IDENT(cur_chr)))
-    {
-        temp.push_back(cur_chr);
         advance();
-    }
+    
+    //Construct string from starting to current character
+    std::string temp(start_pos, &text[cur_pos]);
 
     //Using the identifier map, if the string exists in the map, its a keyword, else its just identifier
     auto elem = identifier_map.find(temp);
@@ -210,6 +221,22 @@ void Lexer::lex()
                 set_token(",", TOKEN_COMMA);
                 advance();
                 return;
+            //.. and ...
+            case '.':
+                advance();
+                if(cur_chr == '.') {
+                    advance();
+                    if(cur_chr == '.')
+                    {
+                        set_token("...", TOKEN_ELLIPSIS);
+                        advance();
+                        return;
+                    }
+                    set_token("..", TOKEN_RANGE);
+                    return;
+                }
+                //Else its an error for now
+                printError("LexerError", "Expected '.' after previous character (Either '..' or '...')");
             //End of statements
             case ';':
                 set_token(";", TOKEN_SEMIC);

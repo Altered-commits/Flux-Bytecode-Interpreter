@@ -9,6 +9,9 @@ std::stack<Object> globalStack;
 //Global symbol table (stack based scope, using vector)
 std::vector<std::unordered_map<std::string, Object>> globalSymbolTable;
 
+//Iterator stack
+std::vector<IterPtr> iteratorStack;
+
 //Think of this as program counter
 std::size_t globalInstructionIndex = 0;
 
@@ -176,6 +179,58 @@ void ByteCodeInterpreter::handleJump(std::size_t jumpOffset)
     globalInstructionIndex = jumpOffset - 1;
 }
 
+void ByteCodeInterpreter::handleIteratorInit(std::uint16_t iterParams)
+{
+    //Get identifier from previous instruction
+    //PreInit consists of the identifier
+    std::string iterId = std::get<std::string>(instructions[globalInstructionIndex - 1].value);
+
+    //iterParams -> Iterator Type << 8 | Identifier Type
+    //Higher 8bits are Iterator Type
+    std::uint8_t iterType  = (iterParams & 0xFF00) >> 8;
+    //Lower 8buts are Identifier Type
+    std::uint8_t identType = (iterParams & 0x00FF);
+
+    //Get iterator of that type
+    switch (identType)
+    {
+        //TOKEN_INT -> 0
+        case 0:
+            iteratorStack.emplace_back(
+                getIterator<int>(iterId, (IteratorType)iterType)
+            );
+            break;
+
+        //TOKEN_FLOAT -> 1
+        case 1:
+            iteratorStack.emplace_back(
+                getIterator<float>(iterId, (IteratorType)iterType)
+            );
+            break;
+    }
+}
+
+void ByteCodeInterpreter::handleIteratorHasNext(std::size_t jumpOffset)
+{
+    //Get the currently used iterator and call hasNext()
+    //If the next element exists, i mean cool, dont do anything, else jump and pop the iterator from stack
+    if(!iteratorStack.back()->hasNext())
+    {
+        //Set jump location
+        globalInstructionIndex = jumpOffset - 1;
+        //Pop the iterator
+        iteratorStack.pop_back();
+    }
+}
+
+void ByteCodeInterpreter::handleIteratorNext(std::size_t jumpOffset)
+{
+    //Call next on iterator
+    iteratorStack.back()->next();
+    //Unconditional jump
+    globalInstructionIndex = jumpOffset - 1;
+}
+
 void ByteCodeInterpreter::decodeFile()
 {
     bool hasInst = true;
@@ -208,6 +263,7 @@ void ByteCodeInterpreter::decodeFile()
                 instructions.emplace_back(inst, std::move(floatValue));
             }
             break;
+
             //Variable assignment / accessing
             case ILInstruction::ASSIGN_VAR:
             case ILInstruction::ASSIGN_VAR_NO_POP:
@@ -220,12 +276,27 @@ void ByteCodeInterpreter::decodeFile()
             //Jump cases
             case ILInstruction::JUMP:
             case ILInstruction::JUMP_IF_FALSE:
-                {
-                    std::size_t jumpOffset;
-                    inFile.read(reinterpret_cast<Byte*>(&jumpOffset), sizeof(size_t));
-                    instructions.emplace_back(inst, std::move(jumpOffset));
-                }
+            //As they have same operands to decode, just put them here
+            case ILInstruction::ITER_HAS_NEXT:
+            case ILInstruction::ITER_NEXT:
+            {
+                std::size_t jumpOffset;
+                inFile.read(reinterpret_cast<Byte*>(&jumpOffset), sizeof(std::size_t));
+                instructions.emplace_back(inst, std::move(jumpOffset));
+            }
+            break;
+            
+            //Iterator
+            case ILInstruction::ITER_PRE_INIT:
+                instructions.emplace_back(inst, std::move(readStringFromFile()));
                 break;
+            case ILInstruction::ITER_INIT:
+            {
+                std::uint16_t iterParams;
+                inFile.read(reinterpret_cast<Byte*>(&iterParams), sizeof(std::uint16_t));
+                instructions.emplace_back(inst, std::move(iterParams));
+            }
+            break;
             //Rest of it just read instruction
             default:
                 instructions.emplace_back(inst);
@@ -260,7 +331,7 @@ void ByteCodeInterpreter::interpretInstructions()
                 handleIntegerArithmetic(i.inst);
                 break;
             
-            //Casting stuff :D
+            //Casting stuff
             case ILInstruction::CAST_FLOAT:
             case ILInstruction::CAST_INT:
                 handleCasting(i.inst);
@@ -310,6 +381,23 @@ void ByteCodeInterpreter::interpretInstructions()
                 handleJump(std::get<std::size_t>(i.value));
                 break;
             
+            //Iterators
+            case ILInstruction::ITER_PRE_INIT:
+                setValueToTopFrame(std::get<std::string>(i.value), 0);
+                break;
+            case ILInstruction::ITER_INIT:
+                handleIteratorInit(std::get<std::uint16_t>(i.value));
+                break;
+            case ILInstruction::ITER_HAS_NEXT:
+                handleIteratorHasNext(std::get<std::size_t>(i.value));
+                break;
+            case ILInstruction::ITER_CURRENT:
+                setValueToTopFrame(iteratorStack.back()->getId(), std::move(iteratorStack.back()->getCurrent()));
+                break;
+            case ILInstruction::ITER_NEXT:
+                handleIteratorNext(std::get<std::size_t>(i.value));
+                break;
+
             //Symbol table
             case ILInstruction::CREATE_SYMBOL_TABLE:
                 createSymbolTable();
@@ -356,6 +444,29 @@ std::string& ByteCodeInterpreter::readStringFromFile()
     inFile.read(&currentVariable[0], length);
 
     return currentVariable;
+}
+
+template<typename T>
+IterPtr ByteCodeInterpreter::getIterator(const std::string& id, IteratorType iterType)
+{
+    switch (iterType)
+    {
+        //Defined in common.hpp
+        case RANGE_ITERATOR:
+        {
+            //Pop three values from stack (step, stop, start)
+            auto vstep  = globalStack.top(); globalStack.pop();
+            auto vstop  = globalStack.top(); globalStack.pop();
+            auto vstart = globalStack.top(); globalStack.pop();
+            return std::visit([&](auto&& step, auto&& stop, auto&& start){
+                //Create the iterator and return it
+                return std::make_unique<RangeIterator<T>>(id, start, stop, step);
+            }, vstep, vstop, vstart);
+        }
+        break;
+        default:
+            std::cout << "Unsupported Iterator\n"; std::exit(1);
+    }
 }
 
 template<typename T, typename U>
@@ -429,14 +540,14 @@ Object ByteCodeInterpreter::getValueFromSymbolTable(const std::string& id)
 
 void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object elem)
 {
-    globalSymbolTable.back()[id] = elem;
+    globalSymbolTable.back()[id] = std::move(elem);
 }
 
 void ByteCodeInterpreter::setValueToNthFrame(const std::string& id, Object elem)
 {
     for (auto it = globalSymbolTable.rbegin(); it != globalSymbolTable.rend(); ++it) {
         if (it->count(id)) {
-            (*it)[id] = elem;
+            (*it)[id] = std::move(elem);
             break;
         }
     }

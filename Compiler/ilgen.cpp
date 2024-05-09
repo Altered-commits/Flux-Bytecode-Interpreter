@@ -1,8 +1,10 @@
 #include "ilgen.hpp"
 
-//Force generate these instructions (only to be used in ILGenerator functions)
-#define SCOPE_START il_code.emplace_back(ILInstruction::CREATE_SYMBOL_TABLE);
-#define SCOPE_END il_code.emplace_back(ILInstruction::DESTROY_SYMBOL_TABLE);
+//Force generate these instructions (only to be used in ILGenerator member functions)
+#define SCOPE_START std::cout << "CREATE_SCOPE\n";\
+                    il_code.emplace_back(ILInstruction::CREATE_SYMBOL_TABLE);
+#define SCOPE_END std::cout << "DESTROY_SCOPE\n";\
+                    il_code.emplace_back(ILInstruction::DESTROY_SYMBOL_TABLE);
 
 std::vector<ILCommand>& ILGenerator::generateIL()
 {
@@ -287,4 +289,58 @@ void ILGenerator::visit(ASTIfNode& if_node, bool is_sub_expr)
         il_code[idx].operand = std::to_string(il_code.size());
     
     SCOPE_END
+}
+
+void ILGenerator::visit(ASTForNode& for_node, bool is_sub_expr)
+{
+    SCOPE_START
+
+    //Generate iterator instructions
+    for_node.range->accept(*this, is_sub_expr);
+
+    //We will evaluate range for next, interpreter will do the job of comparing and jumping
+    //We just provide the location to jump
+    //If the condition is false, it jumps else it doesnt
+    std::cout << "ITER_HAS_NEXT LOC" << '\n';
+    il_code.emplace_back(ILInstruction::ITER_HAS_NEXT);
+    
+    std::size_t iter_has_next_location = il_code.size() - 1;
+
+    //Assign the start value to the identifier using some weird instructions
+    std::cout << "ITER_CURRENT\n";
+    il_code.emplace_back(ILInstruction::ITER_CURRENT);
+
+    //Generate for body
+    for_node.for_body->accept(*this, is_sub_expr);
+    
+    //Go past the current value and loop again
+    std::cout << "ITER_NEXT " << iter_has_next_location << '\n';
+    il_code.emplace_back(ILInstruction::ITER_NEXT, std::to_string(iter_has_next_location));
+
+    //After this location is where its going to jump if condition is false
+    il_code[iter_has_next_location].operand = std::to_string(il_code.size());
+    std::cout << "IHN LOC: " << il_code.size() << '\n';
+
+    //Thats it ig, end the scope
+    SCOPE_END
+}
+
+void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
+{    
+    //Push all three values to stack (start, stop, step)
+    range_iter_node.start->accept(*this, is_sub_expr);
+    range_iter_node.stop->accept(*this, is_sub_expr);
+    range_iter_node.step->accept(*this, is_sub_expr);
+
+    //Pre init aka set up identifier
+    std::cout << "ITER_PRE_INIT " << range_iter_node.iter_identifier << '\n';
+    il_code.emplace_back(ILInstruction::ITER_PRE_INIT, range_iter_node.iter_identifier);
+
+    //Generate an ITER_INIT instruction passing in the type of iterator and iter data type
+    //'Or' them together, then we cast it to integer
+    std::uint16_t data = ((std::uint8_t)IteratorType::RANGE_ITERATOR << 8)
+                        | ((std::uint8_t)range_iter_node.evaluateIterType());
+
+    std::cout << "ITER_INIT " << data << '\n';
+    il_code.emplace_back(ILInstruction::ITER_INIT, std::to_string(data));
 }

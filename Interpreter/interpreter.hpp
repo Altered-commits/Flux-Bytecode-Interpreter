@@ -7,11 +7,13 @@
 #include <variant>
 #include <vector>
 
-#include "..\Common\InstructionSet.hpp"
+#include "..\Common\common.hpp"
 
 using Byte = char;
 using Object = std::variant<int, float>; //Had no other name
-using InstructionValue = std::variant<int, float, std::size_t, std::string>;
+using InstructionValue = std::variant<int, float, std::uint16_t, std::size_t, std::string>;
+
+#include "iterators.hpp"
 
 //Storing commands from file
 struct Instruction
@@ -52,6 +54,10 @@ class ByteCodeInterpreter {
         //Jump
         void handleJumpIfFalse(std::size_t);
         void handleJump(std::size_t);
+        //Iterator
+        void handleIteratorInit(std::uint16_t);
+        void handleIteratorHasNext(std::size_t);
+        void handleIteratorNext(std::size_t);
     
     //Symbol table related
     private:
@@ -64,6 +70,9 @@ class ByteCodeInterpreter {
     private: //Helper functions
         std::string& readStringFromFile();
         
+        template<typename T>
+        IterPtr getIterator(const std::string&, IteratorType);
+
         template<typename T, typename U>
         void compare(const T&, const U&, ILInstruction);
 

@@ -1,6 +1,17 @@
 <STATEMENT> ::= 'Int'/'Float' <identifier> '=' <EXPRESSION> ';'
               | 'Int'/'Float' <identifier> ';'
               | <EXPRESSION> ';'
+              | 'If' '(' <EXPRESSION> ')' '{' <STATEMENT>* '}' <ELIF_CLAUSES> <ELSE_BLOCK>
+              | 'For' <identifier> 'in' <ITERATOR> '{' <STATEMENT>* '}'
+
+<ELIF_CLAUSES> ::= <ELIF_CLAUSE>*
+<ELIF_CLAUSE> ::= 'Elif' '(' <EXPRESSION> ')' '{' <STATEMENT>* '}'
+
+<ELSE_BLOCK> ::= 'Else' '{' <STATEMENT>* '}'
+
+<ITERATOR> ::= <RANGE_ITERATOR>
+
+<RANGE_ITERATOR> ::= <ARITH_EXPRESSION> ('..' | ':') <ARITH_EXPRESSION> (('..' | ':') <ARITH_EXPRESSION>)?
 
 <EXPRESSION> ::= <assignment> (',' <assignment>)*
               | <TERNARY_EXPR>

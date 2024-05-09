@@ -3,7 +3,7 @@
 
 #include <string>
 
-enum TokenType {
+enum TokenType : std::uint8_t {
     //Primitive Types
     TOKEN_INT,
     TOKEN_FLOAT,
@@ -42,6 +42,8 @@ enum TokenType {
     TOKEN_KEYWORD_IF,
     TOKEN_KEYWORD_ELIF,
     TOKEN_KEYWORD_ELSE,
+    TOKEN_KEYWORD_FOR,
+    TOKEN_KEYWORD_IN,
     //, Type
     TOKEN_COMMA,
     //Ternary(? :) Type,
@@ -50,6 +52,11 @@ enum TokenType {
     //Statement End
     TOKEN_SEMIC,
     TOKEN_EOF,
+    //.. and ... (Range and Ellipsis)
+    TOKEN_RANGE,
+    TOKEN_ELLIPSIS,
+    //Iterator Types
+    TOKEN_RANGE_ITER,
     //Idk
     TOKEN_UNKNOWN
 };
