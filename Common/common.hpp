@@ -58,6 +58,7 @@ enum ILInstruction : std::uint8_t
     ITER_HAS_NEXT,
     ITER_NEXT,
     ITER_CURRENT,
+    ITER_RECALC_STEP,
     //Scope symbol table related operation
     CREATE_SYMBOL_TABLE,
     DESTROY_SYMBOL_TABLE,

@@ -38,4 +38,12 @@ static void printError(std::string errorMsg, TokenType operandType)
     std::exit(1);
 }
 
+//I might as well have this print warnings as well ig
+static void printWarning(std::string warningSection, const std::string& warningMsg)
+{
+    auto [cur_line, cur_col] = Lexer::getLineColCount();
+
+    std::cout << "[Warning] From [" <<  warningSection << "]: " << warningMsg
+                << "\n[Warning Info]: " << "Line: " << cur_line << ", Column: " << cur_col << '\n';
+}
 #endif

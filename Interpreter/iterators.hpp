@@ -13,6 +13,7 @@ class Iterator
     public:
         virtual const std::string& getId()      const = 0;
         virtual       Object       getCurrent() const = 0;
+        virtual       void         recalcStep()       = 0;
         virtual       void         next()             = 0;
         virtual       bool         hasNext()    const = 0;
 
@@ -36,6 +37,11 @@ class RangeIterator : public Iterator
 
         const std::string& getId() const override {
             return iterIdentifier;
+        }
+
+        //Lets keep it simple for now
+        void recalcStep() override {
+            step = start < stop ? 1 : -1;
         }
 
         void next() override {

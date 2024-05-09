@@ -166,7 +166,7 @@ void ILGenerator::visit(ASTVariableAccess& var_access_node, bool is_sub_expr)
     il_code.emplace_back(ILInstruction::ACCESS_VAR, var_access_node.identifier);
 }
 
-void ILGenerator::visit(ASTCastDummy& expr, bool is_sub_expr)
+void ILGenerator::visit(ASTCastNode& expr, bool is_sub_expr)
 {
     expr.eval_expr->accept(*this, true);
 
@@ -330,7 +330,18 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
     //Push all three values to stack (start, stop, step)
     range_iter_node.start->accept(*this, is_sub_expr);
     range_iter_node.stop->accept(*this, is_sub_expr);
-    range_iter_node.step->accept(*this, is_sub_expr);
+
+    //Check if step value exists (aka != nullptr)
+    if(range_iter_node.step != nullptr)
+        range_iter_node.step->accept(*this, is_sub_expr);
+    
+    //Tell interpreter to calculate it during runtime
+    //But what i was thinking was, lets just give emplace a dummy value so its satisfied
+    //After initializing Iterator, emplace the ITER_RECALC_STEP instruction
+    else {
+        std::cout << "PUSH_INT 0\n";
+        il_code.emplace_back(ILInstruction::PUSH_INT, "0");
+    }
 
     //Pre init aka set up identifier
     std::cout << "ITER_PRE_INIT " << range_iter_node.iter_identifier << '\n';
@@ -343,4 +354,8 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
 
     std::cout << "ITER_INIT " << data << '\n';
     il_code.emplace_back(ILInstruction::ITER_INIT, std::to_string(data));
+
+    //Iterator is now initialized, recalculate step size
+    std::cout << "ITER_RECALC_STEP\n";
+    il_code.emplace_back(ILInstruction::ITER_RECALC_STEP);
 }

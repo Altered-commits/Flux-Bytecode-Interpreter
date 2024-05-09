@@ -125,36 +125,50 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
     
     //If step is nullptr, do this: if expr is floating (either start or stop), we do complex stuff
     //                             else we take 1 or -1 as step
+    //If we fail to evaluate step value, have runtime do it for us, ONLY if its integer variation
     if(step == nullptr)
     {
         if(start->evaluateExprType() == TOKEN_INT && stop->evaluateExprType() == TOKEN_INT)
         {
-            int eval_start = preEvaluateAST<int>(*start);
-            int eval_stop  = preEvaluateAST<int>(*stop);
+            //I will make ilgen send a special instruction to recalculate this
+            try {
+                int eval_start = preEvaluateAST<int>(*start);
+                int eval_stop  = preEvaluateAST<int>(*stop);
 
-            //If we are evaluating, might as well use this value instead of whole ass tree
-            start = create_value_node(Token(std::to_string(eval_start).c_str(), TOKEN_INT));
-            stop  = create_value_node(Token(std::to_string(eval_stop).c_str(), TOKEN_INT));
+                //If we are evaluating, might as well use this value instead of whole ass tree
+                start = create_value_node(Token(std::to_string(eval_start).c_str(), TOKEN_INT));
+                stop  = create_value_node(Token(std::to_string(eval_stop).c_str(), TOKEN_INT));
 
-            step = std::move(create_value_node(Token(eval_start < eval_stop ? "1" : "-1", TOKEN_INT)));
+                step = std::move(create_value_node(Token(eval_start < eval_stop ? "1" : "-1", TOKEN_INT)));
+            }
+            //We failed to pre evaluate, dont do anything, just notify for now
+            catch(const std::runtime_error& e) {
+                printWarning("Parser", "Failed to Pre-Evaluate step value for 'RangeIterator', will be evaluated during Runtime");
+            }
         }
         else {
-            float eval_start = preEvaluateAST<float>(*start);
-            float eval_stop  = preEvaluateAST<float>(*stop);
+            //I dont want to do this entire thing during runtime, for integer variation its easy, this isn't
+            try {
+                float eval_start = preEvaluateAST<float>(*start);
+                float eval_stop  = preEvaluateAST<float>(*stop);
 
-            //Same here
-            start = create_value_node(Token(std::to_string(eval_start).c_str(), TOKEN_FLOAT));
-            stop  = create_value_node(Token(std::to_string(eval_stop).c_str(), TOKEN_FLOAT));
+                //Same here
+                start = create_value_node(Token(std::to_string(eval_start).c_str(), TOKEN_FLOAT));
+                stop  = create_value_node(Token(std::to_string(eval_stop).c_str(), TOKEN_FLOAT));
 
-            //Calculate the distance between two values
-            float diff = std::abs(eval_stop - eval_start);
+                //Calculate the distance between two values
+                float diff = std::abs(eval_stop - eval_start);
 
-            //Yeah idk what all this does from here but uhh yeah this decently works
-            int order = std::floor(std::log10(diff));
+                //Yeah idk what all this does from here but uhh yeah this decently works
+                int order = std::floor(std::log10(diff));
 
-            float interval = 10.0f * std::pow(10, order-1);
+                float interval = 10.0f * std::pow(10, order-1);
 
-            step = std::move(create_value_node(Token(std::to_string(eval_start < eval_stop ? interval : -interval).c_str(), TOKEN_FLOAT)));
+                step = std::move(create_value_node(Token(std::to_string(eval_start < eval_stop ? interval : -interval).c_str(), TOKEN_FLOAT)));
+            }
+            catch(const std::runtime_error& e) {
+                printError("ParserError", "Failed to Pre-Evaluate step value for 'RangeIterator', please specify step value (start..stop..step)");
+            }
         }
     }
 
@@ -609,7 +623,7 @@ ASTPtr Parser::create_variable_access_node(TokenType var_type, const std::string
 
 ASTPtr Parser::create_cast_dummy_node(TokenType eval_type, ASTPtr&& expr)
 {
-    return std::make_unique<ASTCastDummy>(eval_type, std::move(expr));
+    return std::make_unique<ASTCastNode>(eval_type, std::move(expr));
 }
 
 ASTPtr Parser::create_range_iter_node(ASTPtr&& start, ASTPtr&& stop, ASTPtr&& step, const std::string& iter_id, bool condition_or_construction)
@@ -707,7 +721,7 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
     {
         case CTType::Value:
         {
-            auto value_node = static_cast<const ASTValue&>(node);
+            const auto& value_node = static_cast<const ASTValue&>(node);
 
             if (value_node.type == TOKEN_FLOAT) {
                 return std::stof(value_node.value); // Convert to float
@@ -734,14 +748,14 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
                     return left * right;
                 case TOKEN_DIV:
                     if(right == 0)
-                        printError("CompileTimeError", "Division by zero error while pre-evaluating Binary expression");
+                        printError("ParserError -> CompileTimeEvaluationError", "Division by zero error while pre-evaluating Binary expression");
                     else
                         return left / right;
                 case TOKEN_POW:
                     return std::pow(left, right);
                 //Error
                 default:
-                    printError("CompileTimeError", "Unknown instruction found while pre-evaluating Binary expression");
+                    printError("ParserError -> CompileTimeEvaluationError", "Unknown instruction found while pre-evaluating Binary expression");
             }
         }
         case CTType::Unary:
@@ -757,7 +771,23 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
                 case TOKEN_MINUS:
                     return -expr;
                 default:
-                    printError("CompileTimeError", "Unknown instruction found while pre-evaluating Unary expression");
+                    printError("ParserError -> CompileTimeEvaluationError", "Unknown instruction found while pre-evaluating Unary expression");
+            }
+        }
+        case CTType::Cast:
+        {
+            const auto& cast_node = static_cast<const ASTCastNode&>(node);
+
+            auto expr = preEvaluateAST<RV>(*(cast_node.eval_expr));
+
+            switch (cast_node.eval_type)
+            {
+                case TOKEN_INT:
+                    return static_cast<int>(expr);
+                case TOKEN_FLOAT:
+                    return static_cast<float>(expr);
+                default:
+                    printError("ParserError -> CompileTimeEvaluationError", "Wrong casting type found while pre-evaluating Cast<>");
             }
         }
         case CTType::VarAccess:
@@ -768,6 +798,8 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
             return preEvaluateAST<RV>(*get_expr_from_symbol_table(var_access_node.identifier));
         }
         default:
-            printError("CompileTimeError", "Invalid node type found while pre-evaluating");
+            //Had an idea, if we cant pre evaluate it, EXCEPTION
+            //Returning anything wont really do much, [throw an exception as a indication]
+            throw std::runtime_error("Err");
     }
 }

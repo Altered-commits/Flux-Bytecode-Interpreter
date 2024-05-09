@@ -1,7 +1,7 @@
 ### Flux
 
 **Description:** <br>
-Flux is a custom-built bytecode interpreter currently under development. I am creating it as a part of college project.
+Flux is a custom-built bytecode interpreter currently under development. I am creating it as a part of my own project.
 
 **Usage:** <br>
 To compile, use the following command:<br>

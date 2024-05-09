@@ -29,6 +29,7 @@ enum class CTType {
     Value,
     Binary,
     Unary,
+    Cast,
     VarAccess
 };
 
@@ -38,7 +39,7 @@ struct ASTBinaryOp;
 struct ASTUnaryOp;
 struct ASTVariableAssign;
 struct ASTVariableAccess;
-struct ASTCastDummy;
+struct ASTCastNode;
 struct ASTBlock;
 struct ASTTernaryOp;
 struct ASTIfNode;
@@ -57,7 +58,7 @@ class ASTVisitorInterface
         virtual void visit(ASTUnaryOp& node, bool)        = 0;
         virtual void visit(ASTVariableAssign& node, bool) = 0;
         virtual void visit(ASTVariableAccess& node, bool) = 0;
-        virtual void visit(ASTCastDummy& node, bool)      = 0;
+        virtual void visit(ASTCastNode& node, bool)      = 0;
         virtual void visit(ASTBlock& node, bool)          = 0;
         virtual void visit(ASTTernaryOp& node, bool)      = 0;
         virtual void visit(ASTIfNode& node, bool)         = 0;
@@ -252,12 +253,12 @@ struct ASTVariableAccess : public ASTNode
     }
 };
 
-struct ASTCastDummy : public ASTNode
+struct ASTCastNode : public ASTNode
 {
     TokenType eval_type;
     ASTPtr    eval_expr;
 
-    ASTCastDummy(TokenType eval_type, ASTPtr&& expr)
+    ASTCastNode(TokenType eval_type, ASTPtr&& expr)
         : eval_type(eval_type), eval_expr(std::move(expr))
     {}
 
@@ -274,6 +275,11 @@ struct ASTCastDummy : public ASTNode
 
     TokenType evaluateExprType() const override {
         return eval_type == TOKEN_KEYWORD_FLOAT ? TOKEN_FLOAT : TOKEN_INT;
+    }
+
+    //Tag
+    CTType getType() const override {
+        return CTType::Cast;
     }
 };
 

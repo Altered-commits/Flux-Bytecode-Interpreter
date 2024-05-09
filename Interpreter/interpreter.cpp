@@ -397,7 +397,10 @@ void ByteCodeInterpreter::interpretInstructions()
             case ILInstruction::ITER_NEXT:
                 handleIteratorNext(std::get<std::size_t>(i.value));
                 break;
-
+            case ILInstruction::ITER_RECALC_STEP:
+                iteratorStack.back()->recalcStep();
+                break;
+            
             //Symbol table
             case ILInstruction::CREATE_SYMBOL_TABLE:
                 createSymbolTable();
