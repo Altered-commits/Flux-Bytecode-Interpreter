@@ -19,11 +19,13 @@ enum ILInstruction : std::uint8_t
     SUB,
     MUL,
     DIV,
+    MOD,
     //Floating point version of normal integer instruction
     FADD,
     FSUB,
     FMUL,
     FDIV,
+    FMOD,
     //Unary instructions (NEGATION, etc)
     NEG,
     //Power instruction

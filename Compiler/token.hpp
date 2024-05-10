@@ -24,6 +24,7 @@ enum TokenType : std::uint8_t {
     TOKEN_MINUS,
     TOKEN_MULT,
     TOKEN_DIV,
+    TOKEN_MODULO,
     TOKEN_POW,
     //Assignment Type
     TOKEN_EQ,
@@ -44,6 +45,7 @@ enum TokenType : std::uint8_t {
     TOKEN_KEYWORD_ELSE,
     TOKEN_KEYWORD_FOR,
     TOKEN_KEYWORD_IN,
+    TOKEN_KEYWORD_WHILE,
     //, Type
     TOKEN_COMMA,
     //Ternary(? :) Type,

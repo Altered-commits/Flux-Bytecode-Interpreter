@@ -81,16 +81,35 @@ ASTPtr Parser::parse_for_loop()
     advance();
 
     //Get iterator
-    auto range = parse_iterator(id);
+    auto iter = parse_iterator(id);
 
     //Add the for identifier to symbol table with the evaluated type of range
-    set_value_to_symbol_table(id, range, primitive_to_keyword_type.at(range->evaluateIterType()));
+    set_value_to_symbol_table(id, iter, primitive_to_keyword_type.at(iter->evaluateIterType()));
 
     //Now look for code block as usual
     auto for_body = parse_block();
 
     //Thats it return node
-    return create_for_node(id, std::move(range), std::move(for_body));
+    return create_for_node(id, std::move(iter), std::move(for_body));
+}
+
+ASTPtr Parser::parse_while_loop()
+{
+    //Parser '( comparision ')' '{' block '}'
+    if(!match_types(TOKEN_LPAREN))
+        printError("ParserError", "Expected '(' after 'While'");
+    advance();
+
+    ASTPtr while_condition = parse_comp_expr();
+
+    if(!match_types(TOKEN_RPAREN))
+        printError("ParserError", "Expected ')' after Expression");
+    advance();
+
+    ASTPtr while_body = parse_block();
+
+    //Create and return it
+    return create_while_node(std::move(while_condition), std::move(while_body));
 }
 
 ASTPtr Parser::parse_iterator(const std::string& iter_id)
@@ -428,6 +447,14 @@ ASTPtr Parser::parse_statement()
             destroy_scope();
         }
         break;
+        case TOKEN_KEYWORD_WHILE:
+        {
+            advance();
+            create_scope();
+            function_return_value = parse_while_loop();
+            destroy_scope();
+        }
+        break;
         default:
             function_return_value = parse_expr();
             break;
@@ -436,7 +463,7 @@ ASTPtr Parser::parse_statement()
     //Semi colon only when some conditions aka ignore some keywords
     if(!(statement_type >= TOKEN_KEYWORD_IF
         && 
-        statement_type <= TOKEN_KEYWORD_IN))
+        statement_type <= TOKEN_KEYWORD_WHILE))
     {
         //If the expression makes sense, the user should also end it with a semicolon as well
         if(!match_types(TOKEN_SEMIC))
@@ -514,13 +541,14 @@ ASTPtr Parser::parse_arith_expr()
     return common_binary_op(std::bind(&parse_term, this), TOKEN_PLUS, TOKEN_MINUS);
 }
 
-//Multiply/Divide operation for two numbers
+//Multiply/Divide/Modulo operation for two numbers
 ASTPtr Parser::parse_term()
 {
-    return common_binary_op(std::bind(&parse_factor, this), TOKEN_MULT, TOKEN_DIV);
+    //Note: Mask(termExprTypeMask) exists in ast.hpp
+    return common_binary_op(std::bind(&parse_factor, this), termExprTypeMask);
 }
 
-//Unary Op or Power function
+//Unary Op
 ASTPtr Parser::parse_factor()
 {
     switch (current_token.token_type)
@@ -649,6 +677,11 @@ ASTPtr Parser::create_if_node(ASTPtr&& if_cond, ASTPtr&& if_body, std::vector<st
 ASTPtr Parser::create_for_node(const std::string& id, ASTPtr&& range, ASTPtr&& for_body)
 {
     return std::make_unique<ASTForNode>(id, std::move(range), std::move(for_body));
+}
+
+ASTPtr Parser::create_while_node(ASTPtr&& while_condition, ASTPtr&& while_body)
+{
+    return std::make_unique<ASTWhileNode>(std::move(while_condition), std::move(while_body));
 }
 
 //-----------------ACTUALLY Helper functions-----------------

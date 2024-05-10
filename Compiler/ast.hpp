@@ -13,12 +13,16 @@ using ASTPtr    = std::unique_ptr<ASTNode>;
 using ASTRawPtr = ASTNode*;
 
 //BTW, this may look useless right now but trust me its important for same precedence operators
-constexpr size_t comparisionTypeMask = (1ULL << static_cast<std::size_t>(TOKEN_EEQ))
+constexpr std::size_t comparisionTypeMask = (1ULL << static_cast<std::size_t>(TOKEN_EEQ))
                                     | (1ULL << static_cast<std::size_t>(TOKEN_NEQ))
                                     | (1ULL << static_cast<std::size_t>(TOKEN_GT))
                                     | (1ULL << static_cast<std::size_t>(TOKEN_LT))
                                     | (1ULL << static_cast<std::size_t>(TOKEN_GTEQ))
                                     | (1ULL << static_cast<std::size_t>(TOKEN_LTEQ));
+
+constexpr std::size_t termExprTypeMask = (1ULL << static_cast<std::size_t>(TOKEN_DIV))
+                                    | (1ULL << static_cast<std::size_t>(TOKEN_MULT))
+                                    | (1ULL << static_cast<std::size_t>(TOKEN_MODULO));
 
 //Used for comparing token type in a type mask
 #define SAME_PRECEDENCE_MASK_CHECK(token, mask) (((1ULL << static_cast<std::size_t>(token)) & mask))
@@ -45,6 +49,7 @@ struct ASTTernaryOp;
 struct ASTIfNode;
 struct ASTRangeIterator;
 struct ASTForNode;
+struct ASTWhileNode;
 
 //We will be using the -> Visitor Pattern
 //--------Visitor interface--------
@@ -58,12 +63,13 @@ class ASTVisitorInterface
         virtual void visit(ASTUnaryOp& node, bool)        = 0;
         virtual void visit(ASTVariableAssign& node, bool) = 0;
         virtual void visit(ASTVariableAccess& node, bool) = 0;
-        virtual void visit(ASTCastNode& node, bool)      = 0;
+        virtual void visit(ASTCastNode& node, bool)       = 0;
         virtual void visit(ASTBlock& node, bool)          = 0;
         virtual void visit(ASTTernaryOp& node, bool)      = 0;
         virtual void visit(ASTIfNode& node, bool)         = 0;
         virtual void visit(ASTRangeIterator& node, bool)  = 0;
         virtual void visit(ASTForNode& node, bool)        = 0;
+        virtual void visit(ASTWhileNode& node, bool)      = 0;
 };
 
 //AST nodes
@@ -75,14 +81,14 @@ struct ASTNode
     virtual void accept(ASTVisitorInterface& visitor, bool is_sub_expr) = 0;
 
     //AST Checks
-    virtual bool isFloat() const = 0;
-    virtual bool isPowerOp() const = 0;
+    virtual bool isFloat() const { return false; }
+    virtual bool isPowerOp() const { return false; }
 
     //Think of it as a tag for each type
     virtual CTType getType() const { return CTType::NA; }
 
     //Expression evaluation for final type (variables and range)
-    virtual TokenType evaluateExprType() const = 0;
+    virtual TokenType evaluateExprType() const { return TOKEN_UNKNOWN; }
     virtual TokenType evaluateIterType() const { return TOKEN_UNKNOWN; }
 };
 
@@ -239,9 +245,6 @@ struct ASTVariableAccess : public ASTNode
     bool isFloat() const override {
         return var_type == TOKEN_KEYWORD_FLOAT;
     }
-    bool isPowerOp() const override {
-        return false;
-    }
 
     TokenType evaluateExprType() const override {
         return var_type == TOKEN_KEYWORD_FLOAT ? TOKEN_FLOAT : TOKEN_INT;
@@ -269,9 +272,6 @@ struct ASTCastNode : public ASTNode
     bool isFloat() const override {
         return eval_type == TOKEN_KEYWORD_FLOAT;
     }
-    bool isPowerOp() const override {
-        return false;
-    }
 
     TokenType evaluateExprType() const override {
         return eval_type == TOKEN_KEYWORD_FLOAT ? TOKEN_FLOAT : TOKEN_INT;
@@ -298,17 +298,6 @@ struct ASTBlock : public ASTNode
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
         visitor.visit(*this, is_sub_expr);
-    }
-
-    bool isFloat() const override {
-        return false;
-    }
-    bool isPowerOp() const override {
-        return false;
-    }
-
-    TokenType evaluateExprType() const override {
-        return TOKEN_UNKNOWN;
     }
 };
 
@@ -361,17 +350,6 @@ struct ASTIfNode : ASTNode
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
         visitor.visit(*this, is_sub_expr);
     }
-
-    bool isFloat() const override {
-        return false;
-    }
-    bool isPowerOp() const override {
-        return false;
-    }
-
-    TokenType evaluateExprType() const override {
-        return TOKEN_UNKNOWN;
-    }
 };
 
 //--------------ITERATORS--------------
@@ -400,22 +378,19 @@ struct ASTRangeIterator : public ASTBaseIterator
         visitor.visit(*this, is_sub_expr);
     }
 
-    bool isFloat() const override {
-        return false;
-    }
-    bool isPowerOp() const override {
-        return false;
-    }
-
     TokenType evaluateExprType() const override {
         return TOKEN_RANGE_ITER;
     }
 
     TokenType evaluateIterType() const override {
-        TokenType tsr = start->evaluateExprType();
-        TokenType tso = stop->evaluateExprType();
-
-        return (tsr == TOKEN_FLOAT || tso == TOKEN_FLOAT) ? TOKEN_FLOAT : TOKEN_INT;
+        if (start->evaluateExprType() == TOKEN_FLOAT)
+            return TOKEN_FLOAT;
+        if(stop->evaluateExprType() == TOKEN_FLOAT)
+            return TOKEN_FLOAT;
+        if(step->evaluateExprType() == TOKEN_FLOAT)
+            return TOKEN_FLOAT;
+        
+        return TOKEN_INT;
     }
 };
 
@@ -433,16 +408,18 @@ struct ASTForNode : public ASTNode
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
         visitor.visit(*this, is_sub_expr);
     }
+};
 
-    bool isFloat() const override {
-        return false;
-    }
-    bool isPowerOp() const override {
-        return false;
-    }
+struct ASTWhileNode : public ASTNode
+{
+    ASTPtr while_condition, while_body;
 
-    TokenType evaluateExprType() const override {
-        return TOKEN_UNKNOWN;
+    ASTWhileNode(ASTPtr&& while_condition, ASTPtr&& while_body)
+        : while_condition(std::move(while_condition)), while_body(std::move(while_body))
+    {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
     }
 };
 

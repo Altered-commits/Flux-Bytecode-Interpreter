@@ -68,6 +68,7 @@ class Lexer
             {"Else", TOKEN_KEYWORD_ELSE},
             {"For", TOKEN_KEYWORD_FOR},
             {"in", TOKEN_KEYWORD_IN},
+            {"While", TOKEN_KEYWORD_WHILE},
         };
 
 };

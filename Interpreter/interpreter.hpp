@@ -63,7 +63,7 @@ class ByteCodeInterpreter {
     private:
         void   createSymbolTable();
         void   destroySymbolTable();
-        Object getValueFromSymbolTable(const std::string&);
+        Object getValueFromNthFrame(const std::string&);
         void   setValueToTopFrame(const std::string&, Object);
         void   setValueToNthFrame(const std::string&, Object);
     

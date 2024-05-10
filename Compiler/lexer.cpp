@@ -152,6 +152,10 @@ void Lexer::lex()
                 }
                 set_token("/", TOKEN_DIV);
                 return;
+            case '%':
+                set_token("%", TOKEN_MODULO);
+                advance();
+                return;
             case '(':
                 set_token("(", TOKEN_LPAREN);
                 advance();

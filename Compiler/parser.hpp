@@ -36,6 +36,7 @@ class Parser
     private:
         ASTPtr parse_if_condition();
         ASTPtr parse_for_loop();
+        ASTPtr parse_while_loop();
         ASTPtr parse_iterator(const std::string&);
         ASTPtr parse_range_iterator(const std::string&, bool);
         ASTPtr parse_block();
@@ -58,6 +59,7 @@ class Parser
         ASTPtr create_if_node(ASTPtr&&, ASTPtr&&, std::vector<std::pair<ASTPtr, ASTPtr>>&&, ASTPtr&&);
         ASTPtr create_range_iter_node(ASTPtr&&, ASTPtr&&, ASTPtr&&, const std::string&, bool);
         ASTPtr create_for_node(const std::string&, ASTPtr&&, ASTPtr&&);
+        ASTPtr create_while_node(ASTPtr&&, ASTPtr&&);
 
     //Scope
     private:

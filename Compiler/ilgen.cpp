@@ -75,6 +75,10 @@ void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool is_sub_expr)
             std::cout << (isFloatOperation ? "FDIV\n" : "DIV\n");
             il_code.emplace_back(isFloatOperation ? ILInstruction::FDIV : ILInstruction::DIV);
             break;
+        case TOKEN_MODULO:
+            std::cout << (isFloatOperation ? "FMOD\n" : "MOD\n");
+            il_code.emplace_back(isFloatOperation ? ILInstruction::FMOD : ILInstruction::MOD);
+            break;
         case TOKEN_POW:
             std::cout << "POW\n";
             il_code.emplace_back(ILInstruction::POW);
@@ -225,7 +229,6 @@ void ILGenerator::visit(ASTTernaryOp& ternary_node, bool is_sub_expr)
 
 void ILGenerator::visit(ASTIfNode& if_node, bool is_sub_expr)
 {
-    SCOPE_START
     //Some important variable
     std::vector<std::size_t> elif_jump_locations;
     //Generate if condition
@@ -239,6 +242,8 @@ void ILGenerator::visit(ASTIfNode& if_node, bool is_sub_expr)
 
     std::cout << "JUMP_IF_FALSE (If)\n";
 
+    //Entire If scope starts from '{' after If condition till the end of expression
+    SCOPE_START
     //Generate if body
     if_node.if_body->accept(*this, is_sub_expr);
 
@@ -325,6 +330,35 @@ void ILGenerator::visit(ASTForNode& for_node, bool is_sub_expr)
     SCOPE_END
 }
 
+void ILGenerator::visit(ASTWhileNode& while_node, bool is_sub_expr)
+{
+    //This is probably the easiest
+    SCOPE_START
+
+    std::size_t while_condition_location = il_code.size();
+    //Generate condition
+    while_node.while_condition->accept(*this, true);
+    //Condition false? jump out of loop
+    std::cout << "JUMP_IF_FALSE LOC\n";
+    il_code.emplace_back(ILInstruction::JUMP_IF_FALSE);
+
+    std::size_t jump_if_false_location = il_code.size() - 1;
+    
+    //Generate body
+    while_node.while_body->accept(*this, is_sub_expr);
+
+    //End of expression, unconditional jump back to evaluating condition
+    std::cout << "JUMP " << while_condition_location << '\n';
+    il_code.emplace_back(ILInstruction::JUMP, std::to_string(while_condition_location));
+
+    //End of loop, update JUMP_IF_FALSE location
+    std::cout << "LOC: " << il_code.size() << '\n';
+    il_code[jump_if_false_location].operand = std::to_string(il_code.size());
+
+    SCOPE_END
+}
+
+//------------ITERATORS------------
 void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
 {    
     //Push all three values to stack (start, stop, step)
@@ -354,8 +388,10 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
 
     std::cout << "ITER_INIT " << data << '\n';
     il_code.emplace_back(ILInstruction::ITER_INIT, std::to_string(data));
-
-    //Iterator is now initialized, recalculate step size
-    std::cout << "ITER_RECALC_STEP\n";
-    il_code.emplace_back(ILInstruction::ITER_RECALC_STEP);
+    
+    //Iterator is now initialized, recalculate step size if step is null
+    if(range_iter_node.step == nullptr) {
+        std::cout << "ITER_RECALC_STEP\n";
+        il_code.emplace_back(ILInstruction::ITER_RECALC_STEP);
+    }
 }

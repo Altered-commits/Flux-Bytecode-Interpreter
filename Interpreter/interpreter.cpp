@@ -1,10 +1,13 @@
-#include <stack>
+// #include <stack>
 #include <unordered_map>
 
 #include "interpreter.hpp"
 
+//Just easier to write 
+#define STACK_REVERSE_ACCESS_ELEM(n) (globalStack[globalStack.size() - n])
+
 //Global Stack
-std::stack<Object> globalStack;
+std::vector<Object> globalStack;
 
 //Global symbol table (stack based scope, using vector)
 std::vector<std::unordered_map<std::string, Object>> globalSymbolTable;
@@ -17,10 +20,8 @@ std::size_t globalInstructionIndex = 0;
 
 void ByteCodeInterpreter::handleIntegerArithmetic(ILInstruction inst)
 {
-    auto elem1 = std::get<int>(globalStack.top());
-    globalStack.pop();
-    auto elem2 = std::get<int>(globalStack.top());
-    globalStack.pop();
+    auto& elem1 = std::get<int>(globalStack.back());
+    auto& elem2 = std::get<int>(STACK_REVERSE_ACCESS_ELEM(2));
 
     int out;
 
@@ -32,6 +33,15 @@ void ByteCodeInterpreter::handleIntegerArithmetic(ILInstruction inst)
             out = elem2 - elem1; break;
         case ILInstruction::MUL:
             out = elem2 * elem1; break;
+        case ILInstruction::MOD:
+        {
+            if(elem1 == 0)
+            {
+                std::cout << "[RuntimeError]: Modulus By 0"; std::exit(1);
+            }
+            out = elem2 % elem1;
+        }
+        break;    
         case ILInstruction::DIV:
         {
             if(elem1 == 0)
@@ -42,7 +52,11 @@ void ByteCodeInterpreter::handleIntegerArithmetic(ILInstruction inst)
         }
         break;
     }
-    globalStack.push(out);
+    
+    // Update the top element in place
+    STACK_REVERSE_ACCESS_ELEM(2) = out;
+    // Remove the top element
+    globalStack.pop_back();
 }
 
 void ByteCodeInterpreter::handleFloatingArithmetic(ILInstruction inst)
@@ -53,14 +67,12 @@ void ByteCodeInterpreter::handleFloatingArithmetic(ILInstruction inst)
     //First element to pop
     std::visit([&elem1](auto&& arg){
         elem1 = static_cast<float>(arg);
-    }, globalStack.top());
-    globalStack.pop();
+    }, globalStack.back());
 
     //Second element to pop
     std::visit([&elem2](auto&& arg){
         elem2 = static_cast<float>(arg);
-    }, globalStack.top());
-    globalStack.pop();
+    }, STACK_REVERSE_ACCESS_ELEM(2));
 
     float out;
 
@@ -72,6 +84,15 @@ void ByteCodeInterpreter::handleFloatingArithmetic(ILInstruction inst)
             out = elem2 - elem1; break;
         case ILInstruction::FMUL:
             out = elem2 * elem1; break;
+        case ILInstruction::FMOD:
+        {
+            if(elem1 == 0.0f)
+            {
+                std::cout << "[RuntimeError]: Modulus By 0"; std::exit(1);
+            }
+            out = std::fmod(elem2, elem1);
+        }
+        break;
         case ILInstruction::FDIV:
         {
             if(elem1 == 0.0f)
@@ -84,39 +105,38 @@ void ByteCodeInterpreter::handleFloatingArithmetic(ILInstruction inst)
         case ILInstruction::POW:
             out = std::pow(elem2, elem1); break;
     }
-    globalStack.push(out);
+    
+    STACK_REVERSE_ACCESS_ELEM(2) = out;
+    globalStack.pop_back();
 }
 
 void ByteCodeInterpreter::handleUnaryArithmetic()
 {
+    //Unary not handled in 'handleComparisionAndLogical'
     std::visit([](auto&& arg) {
-
-        globalStack.pop();
         arg = -arg;
-        globalStack.push(arg);
-
-    }, globalStack.top());
+    }, globalStack.back());
 }
 
 void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst, const std::string& identifier)
 {
     //Before pushing it to symbol table, pop the stack to get evaluated expression
-    auto elem = globalStack.top();
+    auto elem = globalStack.back();
 
     switch (inst)
     {
         //If assign var: pop and assign, Else: assign
         case ASSIGN_VAR:
-            globalStack.pop();
+            globalStack.pop_back();
         case ASSIGN_VAR_NO_POP:
-            setValueToTopFrame(identifier, elem);
+            setValueToTopFrame(identifier, std::move(elem));
             break;
 
         //Only difference, look the entire symbol table to set value
         case REASSIGN_VAR:
-            globalStack.pop();
+            globalStack.pop_back();
         case REASSIGN_VAR_NO_POP:
-            setValueToNthFrame(identifier, elem);
+            setValueToNthFrame(identifier, std::move(elem));
             break;
     }
 }
@@ -124,23 +144,23 @@ void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst, const std
 void ByteCodeInterpreter::handleVariableAccess(const std::string& identifier)
 {
     //Variant should handle the rest ig
-    globalStack.push(getValueFromSymbolTable(identifier));
+    globalStack.emplace_back(std::move(getValueFromNthFrame(identifier)));
 }
 
 void ByteCodeInterpreter::handleCasting(ILInstruction inst)
 {   
     std::visit([&inst](auto&& arg){
-        globalStack.pop();
+        globalStack.pop_back();
 
-        inst == CAST_INT ? globalStack.push(static_cast<int>(arg))
-                         : globalStack.push(static_cast<float>(arg));
-    }, globalStack.top());
+        inst == CAST_INT ? globalStack.emplace_back(static_cast<int>(arg))
+                         : globalStack.emplace_back(static_cast<float>(arg));
+    }, globalStack.back());
 }
 
 void ByteCodeInterpreter::handleComparisionAndLogical(ILInstruction inst)
 {
-    auto elem1 = globalStack.top();
-    globalStack.pop();
+    auto elem1 = globalStack.back();
+    globalStack.pop_back();
     switch (inst)
     {
         case NOT:
@@ -150,8 +170,8 @@ void ByteCodeInterpreter::handleComparisionAndLogical(ILInstruction inst)
             break;
         //Rest of the comparision / logical stuff
         default:
-            auto elem2 = globalStack.top();
-            globalStack.pop();
+            auto elem2 = globalStack.back();
+            globalStack.pop_back();
 
             std::visit([&](auto&& arg1, auto&& arg2){
                 compare(arg2, arg1, inst);
@@ -164,11 +184,11 @@ void ByteCodeInterpreter::handleJumpIfFalse(std::size_t jumpOffset)
 {
     //Pop the value of condition
     std::visit([&](auto&& arg){
-        globalStack.pop();
+        globalStack.pop_back();
         //Check the condition, if arg is false, we jump, aka change the globalIndex
         globalInstructionIndex = !arg ? jumpOffset - 1 : globalInstructionIndex;
         //or we just dont do anything
-    }, globalStack.top());
+    }, globalStack.back());
 }
 
 void ByteCodeInterpreter::handleJump(std::size_t jumpOffset)
@@ -328,6 +348,7 @@ void ByteCodeInterpreter::interpretInstructions()
             case ILInstruction::SUB:
             case ILInstruction::MUL:
             case ILInstruction::DIV:
+            case ILInstruction::MOD:
                 handleIntegerArithmetic(i.inst);
                 break;
             
@@ -342,6 +363,7 @@ void ByteCodeInterpreter::interpretInstructions()
             case ILInstruction::FSUB:
             case ILInstruction::FMUL:
             case ILInstruction::FDIV:
+            case ILInstruction::FMOD:
             case ILInstruction::POW:
                 handleFloatingArithmetic(i.inst);
                 break;
@@ -416,7 +438,7 @@ void ByteCodeInterpreter::interpretInstructions()
                 {
                     std::visit([](auto&& arg){
                         std::cout << "Top of stack: " << arg << '\n';
-                    }, globalStack.top());
+                    }, globalStack.back());
                 }
                 return;
         }
@@ -458,9 +480,12 @@ IterPtr ByteCodeInterpreter::getIterator(const std::string& id, IteratorType ite
         case RANGE_ITERATOR:
         {
             //Pop three values from stack (step, stop, start)
-            auto vstep  = globalStack.top(); globalStack.pop();
-            auto vstop  = globalStack.top(); globalStack.pop();
-            auto vstart = globalStack.top(); globalStack.pop();
+            auto vstep  = STACK_REVERSE_ACCESS_ELEM(1);
+            auto vstop  = STACK_REVERSE_ACCESS_ELEM(2);
+            auto vstart = STACK_REVERSE_ACCESS_ELEM(3);
+            
+            globalStack.resize(globalStack.size() - 3);
+            
             return std::visit([&](auto&& step, auto&& stop, auto&& start){
                 //Create the iterator and return it
                 return std::make_unique<RangeIterator<T>>(id, start, stop, step);
@@ -508,7 +533,7 @@ void ByteCodeInterpreter::compare(const T& arg1, const U& arg2, ILInstruction in
             result = !arg1;
             break;
     }
-    globalStack.push(result);
+    globalStack.push_back(result);
 }
 
 void ByteCodeInterpreter::pushInstructionValue(const InstructionValue& val)
@@ -517,7 +542,7 @@ void ByteCodeInterpreter::pushInstructionValue(const InstructionValue& val)
         using T = std::decay_t<decltype(arg)>;
 
         if constexpr(std::is_same_v<T, int> || std::is_same_v<T, float>)
-            globalStack.push(Object(arg));
+            globalStack.emplace_back(std::move(arg));
     }, val);
 }
 
@@ -532,11 +557,12 @@ void ByteCodeInterpreter::destroySymbolTable()
     globalSymbolTable.pop_back();   
 }
 
-Object ByteCodeInterpreter::getValueFromSymbolTable(const std::string& id)
+Object ByteCodeInterpreter::getValueFromNthFrame(const std::string& id)
 {
     for (auto it = globalSymbolTable.rbegin(); it != globalSymbolTable.rend(); ++it) {
-        if (it->count(id)) {
-            return (*it)[id];
+        auto symbol = it->find(id);
+        if (symbol != it->end()) {
+            return symbol->second;
         }
     }
 }
@@ -549,8 +575,9 @@ void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object elem)
 void ByteCodeInterpreter::setValueToNthFrame(const std::string& id, Object elem)
 {
     for (auto it = globalSymbolTable.rbegin(); it != globalSymbolTable.rend(); ++it) {
-        if (it->count(id)) {
-            (*it)[id] = std::move(elem);
+        auto symbol = it->find(id);
+        if (symbol != it->end()) {
+            symbol->second = std::move(elem);
             break;
         }
     }
