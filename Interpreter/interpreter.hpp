@@ -21,8 +21,12 @@ struct Instruction
     InstructionValue value;
     ILInstruction    inst;
 
-    Instruction(ILInstruction inst, InstructionValue&& value = 0)
-        : inst(inst), value(std::move(value))
+    //Additional data, for scope indexing (for instructions like ACCESS_VAR or ASSIGN_VAR)
+    //Idk why im having this as a literal 16bit value but ight
+    std::uint16_t scopeIndexIfNeeded;
+
+    Instruction(ILInstruction inst, InstructionValue&& value = 0, std::uint16_t scopeIndex = 0)
+        : inst(inst), value(std::move(value)), scopeIndexIfNeeded(scopeIndex)
     {}
 };
 
@@ -47,8 +51,8 @@ class ByteCodeInterpreter {
         void handleUnaryArithmetic();
         void handleIntegerArithmetic(ILInstruction);
         void handleFloatingArithmetic(ILInstruction);
-        void handleVariableAssignment(ILInstruction, const std::string&);
-        void handleVariableAccess(const std::string&);
+        void handleVariableAssignment(ILInstruction, const std::string&, const std::uint8_t);
+        void handleVariableAccess(const std::string&, const std::uint8_t);
         void handleCasting(ILInstruction);
         void handleComparisionAndLogical(ILInstruction);
         //Jump
@@ -63,9 +67,9 @@ class ByteCodeInterpreter {
     private:
         void   createSymbolTable();
         void   destroySymbolTable();
-        Object getValueFromNthFrame(const std::string&);
-        void   setValueToTopFrame(const std::string&, Object);
-        void   setValueToNthFrame(const std::string&, Object);
+        void   setValueToTopFrame(const std::string&, Object&&);
+        void   setValueToNthFrame(const std::string&, Object&&, const std::uint8_t);
+        const Object& getValueFromNthFrame(const std::string&, const std::uint8_t);
     
     private: //Helper functions
         std::string& readStringFromFile();

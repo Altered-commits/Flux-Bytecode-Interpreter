@@ -261,7 +261,7 @@ ASTPtr Parser::parse_cast()
     return create_cast_dummy_node(eval_type, std::move(expr));
 }
 
-ASTPtr Parser::parse_reassignment(TokenType var_type)
+ASTPtr Parser::parse_reassignment(TokenType var_type, std::uint16_t scope_index)
 {
     //Grab the identifier
     if(!match_types(TOKEN_ID))
@@ -269,7 +269,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type)
 
     //Variable name should exist
     std::string identifier = current_token.token_value;
-    if(get_type_from_symbol_table(identifier) == TOKEN_UNKNOWN)
+    if(get_type_from_symbol_table(identifier).first == TOKEN_UNKNOWN)
         printError("ParserError", "Current variable: '", identifier, "' doesn't exist.");
 
     advance();
@@ -288,13 +288,13 @@ ASTPtr Parser::parse_reassignment(TokenType var_type)
     {
         //Add it to symbol table and create AST
         set_value_to_symbol_table(identifier, var_expr, var_type);
-        return create_variable_assign_node(var_type, identifier, std::move(var_expr), true);
+        return create_variable_assign_node(var_type, identifier, std::move(var_expr), true, scope_index);
     }
     //Oops, types dont match, errrorrrrr!
     printError("ParserError", "Evaluated expression type doesn't match the type pre-assigned to variable: ", identifier);
 }
 
-ASTPtr Parser::parse_declaration(TokenType var_type)
+ASTPtr Parser::parse_declaration(TokenType var_type, std::uint16_t scope_index)
 {
     std::vector<ASTPtr> declarations;
     //We check for multiple variables to assign for
@@ -318,7 +318,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
             //Yeah its a bit hard to understand but uhh yeah
             //Bro the compiler is useless af
             declarations.emplace_back(create_variable_assign_node(
-                    var_type, identifier, create_value_node(Token("0", keyword_to_primitive_type.at(var_type))), false));
+                    var_type, identifier, create_value_node(Token("0", keyword_to_primitive_type.at(var_type))), false, scope_index));
             
             //Now add it to symbol table ig
             set_value_to_symbol_table(identifier, declarations.back(), var_type);
@@ -336,7 +336,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
             {
                 //Add it to symbol table and create AST
                 set_value_to_symbol_table(identifier, var_expr, var_type);
-                declarations.emplace_back(create_variable_assign_node(var_type, identifier, std::move(var_expr), false));
+                declarations.emplace_back(create_variable_assign_node(var_type, identifier, std::move(var_expr), false, scope_index));
             }
             else
                 //Oops, types dont match, errrorrrrr!
@@ -352,14 +352,14 @@ ASTPtr Parser::parse_declaration(TokenType var_type)
     return create_block_node(std::move(declarations));
 }
 
-ASTPtr Parser::parse_variable(TokenType var_type, bool is_reassignment)
+ASTPtr Parser::parse_variable(TokenType var_type, bool is_reassignment, std::uint16_t scope_index)
 {
     switch (is_reassignment)
     {
         case true:
-            return parse_reassignment(var_type);
+            return parse_reassignment(var_type, scope_index);
         case false:
-            return parse_declaration(var_type);
+            return parse_declaration(var_type, scope_index);
     }
 }
 
@@ -428,7 +428,7 @@ ASTPtr Parser::parse_statement()
         {
             TokenType var_type = current_token.token_type;
             advance();
-            function_return_value = parse_variable(var_type, false);
+            function_return_value = parse_variable(var_type, false, 0);
         }
         break;
         case TOKEN_KEYWORD_IF:
@@ -475,7 +475,7 @@ ASTPtr Parser::parse_statement()
     return function_return_value;
 }
 
-//Plus/Minus operation for two numbers, variable re-assignment
+//'&&' | '||', ternary expr, variable re-assignment
 ASTPtr Parser::parse_expr()
 {
     //When we want identifier = expr; re-assigning variables
@@ -483,11 +483,11 @@ ASTPtr Parser::parse_expr()
     {
         if(peek().token_type == TOKEN_EQ)
         {
-            auto type = get_type_from_symbol_table(current_token.token_value);
+            auto&&[type, scope_index] = get_type_from_symbol_table(current_token.token_value);
             if(type == TOKEN_UNKNOWN)
                 printError("ParserError", "Undefined variable: ", current_token.token_value);
 
-            return parse_variable(type, true);
+            return parse_variable(type, true, scope_index);
         }
     }
     
@@ -516,7 +516,7 @@ ASTPtr Parser::parse_expr()
     return expr;
 }
 
-//! expression or arith_expr along with  
+//! expression or arith_expr 
 ASTPtr Parser::parse_comp_expr()
 {
     //For ! expr
@@ -545,11 +545,11 @@ ASTPtr Parser::parse_arith_expr()
 ASTPtr Parser::parse_term()
 {
     //Note: Mask(termExprTypeMask) exists in ast.hpp
-    return common_binary_op(std::bind(&parse_factor, this), termExprTypeMask);
+    return common_binary_op(std::bind(&parse_unary, this), termExprTypeMask);
 }
 
 //Unary Op
-ASTPtr Parser::parse_factor()
+ASTPtr Parser::parse_unary()
 {
     switch (current_token.token_type)
     {
@@ -560,7 +560,7 @@ ASTPtr Parser::parse_factor()
             TokenType op_type = current_token.token_type;
 
             advance();
-            auto expr = parse_factor();
+            auto expr = parse_unary();
 
             return create_unary_op_node(op_type, std::move(expr));
         }
@@ -572,7 +572,7 @@ ASTPtr Parser::parse_factor()
 //For power operations, like 2 ^ 2 etc
 ASTPtr Parser::parse_power()
 {
-    return common_binary_op(std::bind(&parse_atom, this), TOKEN_POW, TOKEN_POW, std::bind(&parse_factor, this));
+    return common_binary_op(std::bind(&parse_atom, this), TOKEN_POW, TOKEN_POW, std::bind(&parse_unary, this));
 }
 
 //Primitive elements: INT, FLOAT, (), Cast<>() etc
@@ -583,11 +583,11 @@ ASTPtr Parser::parse_atom()
         //Variable getter
         case TOKEN_ID:
         {
-            auto type = get_type_from_symbol_table(current_token.token_value);
+            auto&&[type, scope_index] = get_type_from_symbol_table(current_token.token_value);
             if(type != TOKEN_UNKNOWN)
             {
                 //We need the proper string value
-                auto expr = create_variable_access_node(type, current_token.token_value);
+                auto expr = create_variable_access_node(type, current_token.token_value, scope_index);
                 advance();
                 return expr;
             }
@@ -639,14 +639,15 @@ ASTPtr Parser::create_unary_op_node(TokenType op_type, ASTPtr&& expr)
     return std::make_unique<ASTUnaryOp>(op_type, std::move(expr));
 }
 
-ASTPtr Parser::create_variable_assign_node(TokenType var_type, const std::string& identifier, ASTPtr&& var_expr, bool is_reassignment)
+ASTPtr Parser::create_variable_assign_node(TokenType var_type, const std::string& identifier, ASTPtr&& var_expr,
+                                            bool is_reassignment, std::uint16_t scope_index)
 {
-    return std::make_unique<ASTVariableAssign>(identifier, var_type, std::move(var_expr), is_reassignment);
+    return std::make_unique<ASTVariableAssign>(identifier, var_type, std::move(var_expr), is_reassignment, scope_index);
 }
 
-ASTPtr Parser::create_variable_access_node(TokenType var_type, const std::string& identifier)
+ASTPtr Parser::create_variable_access_node(TokenType var_type, const std::string& identifier, std::uint16_t scope_index)
 {
-    return std::make_unique<ASTVariableAccess>(identifier, var_type);
+    return std::make_unique<ASTVariableAccess>(identifier, var_type, scope_index);
 }
 
 ASTPtr Parser::create_cast_dummy_node(TokenType eval_type, ASTPtr&& expr)
@@ -707,22 +708,28 @@ void Parser::set_value_to_symbol_table(const std::string& id, const ASTPtr& expr
     temporary_symbol_table.back()[id] = std::make_pair(expr.get(), ttype);
 }
 
-TokenType Parser::get_type_from_symbol_table(const std::string& id)
+std::pair<TokenType, std::uint16_t> Parser::get_type_from_symbol_table(const std::string& id)
 {
-    for (auto it = temporary_symbol_table.rbegin(); it != temporary_symbol_table.rend(); ++it) {
-        if (it->count(id)) {
-            return (*it)[id].second;
+    //Whatever the value of i is will be the scope index as well
+    for(auto i = temporary_symbol_table.size() - 1; i >= 0; --i)
+    {
+        const auto& table  = temporary_symbol_table[i];
+        const auto& symbol = table.find(id);
+
+        if(symbol != table.end()){
+            return {symbol->second.second, i};
         }
     }
-    return TOKEN_UNKNOWN;
+    return {TOKEN_UNKNOWN, 0};
 }
 
 //This variation is pretty much used for pre-evaluating expressions
 ASTRawPtr Parser::get_expr_from_symbol_table(const std::string& id)
 {
     for (auto it = temporary_symbol_table.rbegin(); it != temporary_symbol_table.rend(); ++it) {
-        if (it->count(id)) {
-            return (*it)[id].first;
+        auto symbol = it->find(id);
+        if (symbol != it->end()) {
+            return symbol->second.first;
         }
     }
     //This can't/shouldn't really fail, as this is used after creation of tree
@@ -730,13 +737,14 @@ ASTRawPtr Parser::get_expr_from_symbol_table(const std::string& id)
 
 bool Parser::find_variable_from_current_scope(const std::string& identifier)
 {
-    return temporary_symbol_table.back().count(identifier) ? true : false;    
+    auto symbol = temporary_symbol_table.back().find(identifier);
+    return symbol != temporary_symbol_table.back().end() ? true : false;    
 }
 
 void Parser::create_scope()
 {
     //Create and push a scope
-    temporary_symbol_table.push_back({});    
+    temporary_symbol_table.emplace_back();    
 }
 
 void Parser::destroy_scope()

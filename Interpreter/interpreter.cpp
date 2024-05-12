@@ -1,5 +1,5 @@
-// #include <stack>
 #include <unordered_map>
+#include <chrono>
 
 #include "interpreter.hpp"
 
@@ -118,33 +118,26 @@ void ByteCodeInterpreter::handleUnaryArithmetic()
     }, globalStack.back());
 }
 
-void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst, const std::string& identifier)
+void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst, const std::string& identifier, const std::uint8_t scopeIndex)
 {
-    //Before pushing it to symbol table, pop the stack to get evaluated expression
     auto elem = globalStack.back();
+    
+    const bool shouldPop = inst != ASSIGN_VAR_NO_POP && inst != REASSIGN_VAR_NO_POP;
+    const bool shouldReassign = inst == REASSIGN_VAR || inst == REASSIGN_VAR_NO_POP;
 
-    switch (inst)
-    {
-        //If assign var: pop and assign, Else: assign
-        case ASSIGN_VAR:
-            globalStack.pop_back();
-        case ASSIGN_VAR_NO_POP:
-            setValueToTopFrame(identifier, std::move(elem));
-            break;
-
-        //Only difference, look the entire symbol table to set value
-        case REASSIGN_VAR:
-            globalStack.pop_back();
-        case REASSIGN_VAR_NO_POP:
-            setValueToNthFrame(identifier, std::move(elem));
-            break;
-    }
+    // Pop the stack to get the evaluated expression if necessary
+    if (shouldPop)
+        globalStack.pop_back();
+    
+    // Determine whether to reassign the variable or not
+    shouldReassign ? setValueToNthFrame(identifier, std::move(elem), scopeIndex)
+                   : setValueToTopFrame(identifier, std::move(elem));
 }
 
-void ByteCodeInterpreter::handleVariableAccess(const std::string& identifier)
+void ByteCodeInterpreter::handleVariableAccess(const std::string& identifier, const std::uint8_t scopeIndex)
 {
     //Variant should handle the rest ig
-    globalStack.emplace_back(std::move(getValueFromNthFrame(identifier)));
+    globalStack.emplace_back(std::move(getValueFromNthFrame(identifier, scopeIndex)));
 }
 
 void ByteCodeInterpreter::handleCasting(ILInstruction inst)
@@ -287,11 +280,21 @@ void ByteCodeInterpreter::decodeFile()
             //Variable assignment / accessing
             case ILInstruction::ASSIGN_VAR:
             case ILInstruction::ASSIGN_VAR_NO_POP:
+                instructions.emplace_back(inst, std::move(readStringFromFile()), 0);
+                break;
+            //But for these instruction, these will be followed by a DATAINST_VAR_SCOPE_IDX instruction containing the index
             case ILInstruction::REASSIGN_VAR:
             case ILInstruction::REASSIGN_VAR_NO_POP:
             case ILInstruction::ACCESS_VAR:
-                instructions.emplace_back(inst, std::move(readStringFromFile()));
+                instructions.emplace_back(inst, std::move(readStringFromFile()), instructions[instructions.size() - 1].scopeIndexIfNeeded);
                 break;
+            case ILInstruction::DATAINST_VAR_SCOPE_IDX:
+            {
+                std::uint16_t scopeIndex;
+                inFile.read(reinterpret_cast<Byte*>(&scopeIndex), sizeof(std::uint16_t));
+                instructions.emplace_back(inst, 0 ,scopeIndex);
+            }
+            break;
             
             //Jump cases
             case ILInstruction::JUMP:
@@ -307,7 +310,7 @@ void ByteCodeInterpreter::decodeFile()
             break;
             
             //Iterator
-            case ILInstruction::ITER_PRE_INIT:
+            case ILInstruction::DATAINST_ITER_ID:
                 instructions.emplace_back(inst, std::move(readStringFromFile()));
                 break;
             case ILInstruction::ITER_INIT:
@@ -387,11 +390,11 @@ void ByteCodeInterpreter::interpretInstructions()
             case ILInstruction::ASSIGN_VAR_NO_POP:
             case ILInstruction::REASSIGN_VAR:
             case ILInstruction::REASSIGN_VAR_NO_POP:
-                handleVariableAssignment(i.inst, std::get<std::string>(i.value));
+                handleVariableAssignment(i.inst, std::get<std::string>(i.value), i.scopeIndexIfNeeded);
                 break;
             
             case ILInstruction::ACCESS_VAR:
-                handleVariableAccess(std::get<std::string>(i.value));
+                handleVariableAccess(std::get<std::string>(i.value), i.scopeIndexIfNeeded);
                 break;
             
             //Jump conditions
@@ -404,9 +407,9 @@ void ByteCodeInterpreter::interpretInstructions()
                 break;
             
             //Iterators
-            case ILInstruction::ITER_PRE_INIT:
-                setValueToTopFrame(std::get<std::string>(i.value), 0);
-                break;
+            // case ILInstruction::DATAINST_ITER_ID:
+            //     setValueToTopFrame(std::get<std::string>(i.value), 0);
+            //     break;
             case ILInstruction::ITER_INIT:
                 handleIteratorInit(std::get<std::uint16_t>(i.value));
                 break;
@@ -451,11 +454,26 @@ void ByteCodeInterpreter::interpretInstructions()
 void ByteCodeInterpreter::interpret()
 {
     //Initialize global symbol table with one frame / global frame
-    globalSymbolTable.push_back({});
+    globalSymbolTable.emplace_back();
 
-    //Decode and execute instructions
+    auto start_df = std::chrono::high_resolution_clock::now();
+
+    //Decode File
     decodeFile();
+
+    auto end_df = std::chrono::high_resolution_clock::now();
+    
+    auto start_ii = std::chrono::high_resolution_clock::now();
+
+    //Execute instructions
     interpretInstructions();
+
+    auto end_ii = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Time to decode entire file: " <<
+        (std::chrono::duration_cast<std::chrono::microseconds>(end_df - start_df)).count() << "ms" << '\n';
+    std::cout << "Time to interpret decoded instructions: " <<
+        (std::chrono::duration_cast<std::chrono::microseconds>(end_ii - start_ii)).count() << "ms" << '\n';
 }
 
 //-----------------Helper Fuctions-----------------
@@ -549,7 +567,7 @@ void ByteCodeInterpreter::pushInstructionValue(const InstructionValue& val)
 //Symbol table related
 void ByteCodeInterpreter::createSymbolTable()
 {
-    globalSymbolTable.push_back({});
+    globalSymbolTable.emplace_back();
 }
 
 void ByteCodeInterpreter::destroySymbolTable()
@@ -557,28 +575,17 @@ void ByteCodeInterpreter::destroySymbolTable()
     globalSymbolTable.pop_back();   
 }
 
-Object ByteCodeInterpreter::getValueFromNthFrame(const std::string& id)
+const Object& ByteCodeInterpreter::getValueFromNthFrame(const std::string& id, const std::uint8_t scopeIndex)
 {
-    for (auto it = globalSymbolTable.rbegin(); it != globalSymbolTable.rend(); ++it) {
-        auto symbol = it->find(id);
-        if (symbol != it->end()) {
-            return symbol->second;
-        }
-    }
+    return globalSymbolTable[scopeIndex].at(id);
 }
 
-void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object elem)
+void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object&& elem)
 {
     globalSymbolTable.back()[id] = std::move(elem);
 }
 
-void ByteCodeInterpreter::setValueToNthFrame(const std::string& id, Object elem)
+void ByteCodeInterpreter::setValueToNthFrame(const std::string& id, Object&& elem, const std::uint8_t scopeIndex)
 {
-    for (auto it = globalSymbolTable.rbegin(); it != globalSymbolTable.rend(); ++it) {
-        auto symbol = it->find(id);
-        if (symbol != it->end()) {
-            symbol->second = std::move(elem);
-            break;
-        }
-    }
+    globalSymbolTable[scopeIndex][id] = std::move(elem);
 }

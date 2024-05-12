@@ -147,6 +147,8 @@ void ILGenerator::visit(ASTVariableAssign& var_assign_node, bool is_sub_expr)
 
     ILInstruction inst;
     
+    //Depending on whether the variable is a sub expression, we either pop and assign value,
+    //or we assign value and not pop the stack
     switch (is_sub_expr)
     {
         case true:
@@ -160,13 +162,23 @@ void ILGenerator::visit(ASTVariableAssign& var_assign_node, bool is_sub_expr)
             inst = var_assign_node.is_reassignment ? ILInstruction::REASSIGN_VAR : ILInstruction::ASSIGN_VAR;
             break;
     }
-    //Depending on whether the variable is a sub expression, we either pop and assign value,
-    //or we assign value and not pop the stack
+    //Normal assignment = don't care about scope index
+    //Re assignment = we care about scope index
+    if(var_assign_node.is_reassignment)
+    {
+        std::cout << "SCOPE_INDEX: " << (int)var_assign_node.scope_index << '\n';
+        il_code.emplace_back(ILInstruction::DATAINST_VAR_SCOPE_IDX, std::to_string(var_assign_node.scope_index));
+    }
+
     il_code.emplace_back(inst, var_assign_node.identifier);
 }
 void ILGenerator::visit(ASTVariableAccess& var_access_node, bool is_sub_expr)
 {
-    std::cout << "ACCESS_VAR " << var_access_node.identifier << '\n';
+    std::cout << "ACCESS_VAR " << var_access_node.identifier << '\n'
+              << "SCOPE_INDEX: " << (int)var_access_node.scope_index << '\n';
+    
+    //Pass the scope index as well with special DATAINST instructions
+    il_code.emplace_back(ILInstruction::DATAINST_VAR_SCOPE_IDX, std::to_string(var_access_node.scope_index));
     il_code.emplace_back(ILInstruction::ACCESS_VAR, var_access_node.identifier);
 }
 
@@ -378,8 +390,8 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
     }
 
     //Pre init aka set up identifier
-    std::cout << "ITER_PRE_INIT " << range_iter_node.iter_identifier << '\n';
-    il_code.emplace_back(ILInstruction::ITER_PRE_INIT, range_iter_node.iter_identifier);
+    std::cout << "DATAINST_ITER_ID " << range_iter_node.iter_identifier << '\n';
+    il_code.emplace_back(ILInstruction::DATAINST_ITER_ID, range_iter_node.iter_identifier);
 
     //Generate an ITER_INIT instruction passing in the type of iterator and iter data type
     //'Or' them together, then we cast it to integer

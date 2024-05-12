@@ -36,6 +36,13 @@ void FileWriter::writeToFile(const std::vector<ILCommand> &commands)
                 case REASSIGN_VAR_NO_POP:
                     writeStringToFile(cmd.operand);
                     break;
+                case DATAINST_VAR_SCOPE_IDX:
+                    {
+                        //16bit uint value
+                        std::uint16_t scopeIndex = std::stoi(cmd.operand);
+                        outFile.write(reinterpret_cast<Byte*>(&scopeIndex), sizeof(std::uint16_t));
+                    }
+                    break;
                 
                 case JUMP_IF_FALSE:
                 case JUMP:
@@ -49,14 +56,14 @@ void FileWriter::writeToFile(const std::vector<ILCommand> &commands)
                     }
                     break;
                 
-                case ITER_PRE_INIT:
+                case DATAINST_ITER_ID:
                     writeStringToFile(cmd.operand);
                     break;
                 case ITER_INIT:
                     {
                         //specifically want a 16bit uint value
-                        std::uint16_t init_params = std::stoi(cmd.operand);
-                        outFile.write(reinterpret_cast<Byte*>(&init_params), sizeof(std::uint16_t));
+                        std::uint16_t initParams = std::stoi(cmd.operand);
+                        outFile.write(reinterpret_cast<Byte*>(&initParams), sizeof(std::uint16_t));
                     }
                     break;
             }

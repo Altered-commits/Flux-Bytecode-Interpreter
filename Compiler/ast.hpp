@@ -204,13 +204,15 @@ struct ASTUnaryOp : public ASTNode
 
 struct ASTVariableAssign : public ASTNode
 {
-    std::string identifier;
-    ASTPtr      expr;
-    TokenType   var_type;
-    bool        is_reassignment;
+    std::string  identifier;
+    ASTPtr       expr;
+    TokenType    var_type;
+    bool         is_reassignment;
+    //Same here as VariableAccess
+    std::uint16_t scope_index;
 
-    ASTVariableAssign(const std::string& identifier, TokenType type, ASTPtr&& expr, bool is_reassignment)
-        : identifier(identifier), var_type(type), expr(std::move(expr)), is_reassignment(is_reassignment)
+    ASTVariableAssign(const std::string& identifier, TokenType type, ASTPtr&& expr, bool is_reassignment, std::uint16_t scope_index)
+        : identifier(identifier), var_type(type), expr(std::move(expr)), is_reassignment(is_reassignment), scope_index(scope_index)
     {}
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
@@ -231,11 +233,13 @@ struct ASTVariableAssign : public ASTNode
 
 struct ASTVariableAccess : public ASTNode
 {
-    std::string identifier;
-    TokenType   var_type;
+    std::string  identifier;
+    TokenType    var_type;
+    //Maintain the scope in which the variable is present
+    std::uint16_t scope_index;
 
-    ASTVariableAccess(const std::string& identifier, TokenType type)
-        : identifier(identifier), var_type(type)
+    ASTVariableAccess(const std::string& identifier, TokenType type, std::uint16_t scope_index)
+        : identifier(identifier), var_type(type), scope_index(scope_index)
     {}
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {

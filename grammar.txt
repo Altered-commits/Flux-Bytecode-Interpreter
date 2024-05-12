@@ -3,6 +3,7 @@
               | <EXPRESSION> ';'
               | 'If' '(' <EXPRESSION> ')' '{' <STATEMENT>* '}' <ELIF_CLAUSES> <ELSE_BLOCK>
               | 'For' <identifier> 'in' <ITERATOR> '{' <STATEMENT>* '}'
+              | 'While' '(' <COMP_EXPRESSION> ')' '{' <STATEMENT>* '}'
 
 <ELIF_CLAUSES> ::= <ELIF_CLAUSE>*
 <ELIF_CLAUSE> ::= 'Elif' '(' <EXPRESSION> ')' '{' <STATEMENT>* '}'
@@ -37,4 +38,4 @@
          | <INT>
          | <FLOAT>
          | '(' <EXPRESSION> ')'
-         | Cast<Int/Float>(<EXPRESSION>)
+         | Cast<Type>(<EXPRESSION>)

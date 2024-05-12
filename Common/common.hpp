@@ -37,6 +37,7 @@ enum ILInstruction : std::uint8_t
     REASSIGN_VAR,
     REASSIGN_VAR_NO_POP,
     ACCESS_VAR,
+    DATAINST_VAR_SCOPE_IDX,
     //Casting instruction
     CAST_INT,
     CAST_FLOAT,
@@ -55,12 +56,12 @@ enum ILInstruction : std::uint8_t
     JUMP_IF_FALSE,
     JUMP,
     //Iteration operations
-    ITER_PRE_INIT,
     ITER_INIT,
     ITER_HAS_NEXT,
     ITER_NEXT,
     ITER_CURRENT,
     ITER_RECALC_STEP,
+    DATAINST_ITER_ID,
     //Scope symbol table related operation
     CREATE_SYMBOL_TABLE,
     DESTROY_SYMBOL_TABLE,

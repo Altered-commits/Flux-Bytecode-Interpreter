@@ -18,7 +18,7 @@ class Parser
             : lex(text), current_token(lex.get_token())
         {
             //Initialize stack with first layer -> global symbol table
-            temporary_symbol_table.push_back({});
+            temporary_symbol_table.emplace_back();
         }
 
         std::vector<ASTPtr>& parse();
@@ -29,7 +29,7 @@ class Parser
         ASTPtr parse_comp_expr();
         ASTPtr parse_arith_expr();
         ASTPtr parse_term();
-        ASTPtr parse_factor();
+        ASTPtr parse_unary();
         ASTPtr parse_power();
         ASTPtr parse_atom();
     
@@ -41,9 +41,9 @@ class Parser
         ASTPtr parse_range_iterator(const std::string&, bool);
         ASTPtr parse_block();
         ASTPtr parse_cast();
-        ASTPtr parse_variable(TokenType, bool);
-        ASTPtr parse_reassignment(TokenType);
-        ASTPtr parse_declaration(TokenType);
+        ASTPtr parse_variable(TokenType, bool, std::uint16_t);
+        ASTPtr parse_reassignment(TokenType, std::uint16_t);
+        ASTPtr parse_declaration(TokenType, std::uint16_t);
         ASTPtr common_binary_op(ParseFuncPtr, TokenType, TokenType, ParseFuncPtr);
         ASTPtr common_binary_op(ParseFuncPtr, std::size_t, ParseFuncPtr);
     
@@ -51,8 +51,8 @@ class Parser
         ASTPtr create_value_node(const Token&);
         ASTPtr create_binary_op_node(TokenType, ASTPtr&&, ASTPtr&&);
         ASTPtr create_unary_op_node(TokenType, ASTPtr&&);
-        ASTPtr create_variable_assign_node(TokenType, const std::string&, ASTPtr&&, bool);
-        ASTPtr create_variable_access_node(TokenType, const std::string&);
+        ASTPtr create_variable_assign_node(TokenType, const std::string&, ASTPtr&&, bool, std::uint16_t);
+        ASTPtr create_variable_access_node(TokenType, const std::string&, std::uint16_t);
         ASTPtr create_cast_dummy_node(TokenType, ASTPtr&&);
         ASTPtr create_block_node(std::vector<ASTPtr>&&);
         ASTPtr create_ternary_op_node(ASTPtr&&, ASTPtr&&, ASTPtr&&);
@@ -63,12 +63,12 @@ class Parser
 
     //Scope
     private:
-        void        set_value_to_symbol_table(const std::string&, const ASTPtr&, TokenType);
-        TokenType   get_type_from_symbol_table(const std::string&);
-        ASTRawPtr   get_expr_from_symbol_table(const std::string&);
-        bool        find_variable_from_current_scope(const std::string&);
-        void        create_scope();
-        void        destroy_scope();
+        void                                set_value_to_symbol_table(const std::string&, const ASTPtr&, TokenType);
+        std::pair<TokenType, std::uint16_t> get_type_from_symbol_table(const std::string&);
+        ASTRawPtr                           get_expr_from_symbol_table(const std::string&); //Pre-Evaluation only
+        bool                                find_variable_from_current_scope(const std::string&);
+        void                                create_scope();
+        void                                destroy_scope();
 
     //Compile time Evaluator
     private:
