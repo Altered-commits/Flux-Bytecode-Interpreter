@@ -3,6 +3,9 @@
 
 #include "interpreter.hpp"
 
+//File decoding related
+#define FILE_READ_CHUNK_SIZE 1024
+
 //Just easier to write 
 #define STACK_REVERSE_ACCESS_ELEM(n) (globalStack[globalStack.size() - n])
 
@@ -248,12 +251,22 @@ void ByteCodeInterpreter::decodeFile()
 {
     bool hasInst = true;
 
+    //Our buffer which will store chunks of file
+    std::size_t       chunkBufferIndex;
+    std::vector<Byte> chunkBuffer(FILE_READ_CHUNK_SIZE);
+
+    //Read one chunk initially ofc
+    readFileChunk(chunkBuffer, chunkBufferIndex);
+
     while (hasInst)
     {
-        Byte instByte;
-        inFile.get(instByte);
-
+        //Instruction is 1 byte, read it and increment
+        Byte instByte = chunkBuffer[chunkBufferIndex++];
         ILInstruction inst = static_cast<ILInstruction>(instByte);
+
+        //Check if we need to refill buffer
+        if(chunkBufferIndex >= chunkBuffer.size())
+            readFileChunk(chunkBuffer, chunkBufferIndex);
 
         switch (inst)
         {
@@ -263,38 +276,29 @@ void ByteCodeInterpreter::decodeFile()
                 break;
             //Primitive types
             case PUSH_INT:
-            {
-                int intValue;
-                inFile.read(reinterpret_cast<Byte*>(&intValue), sizeof(int));
-                instructions.emplace_back(inst, std::move(intValue));
-            }
-            break;
+                //Read operand as int
+                instructions.emplace_back(inst, readOperand<int>(chunkBuffer, chunkBufferIndex));
+                break;
             case PUSH_FLOAT:
-            {
-                float floatValue;
-                inFile.read(reinterpret_cast<Byte*>(&floatValue), sizeof(float));
-                instructions.emplace_back(inst, std::move(floatValue));
-            }
-            break;
+                //Read operand as float
+                instructions.emplace_back(inst, readOperand<float>(chunkBuffer, chunkBufferIndex));
+                break;
 
             //Variable assignment / accessing
             case ILInstruction::ASSIGN_VAR:
             case ILInstruction::ASSIGN_VAR_NO_POP:
-                instructions.emplace_back(inst, std::move(readStringFromFile()), 0);
+                instructions.emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)), 0);
                 break;
             //But for these instruction, these will be followed by a DATAINST_VAR_SCOPE_IDX instruction containing the index
             case ILInstruction::REASSIGN_VAR:
             case ILInstruction::REASSIGN_VAR_NO_POP:
             case ILInstruction::ACCESS_VAR:
-                instructions.emplace_back(inst, std::move(readStringFromFile()), instructions[instructions.size() - 1].scopeIndexIfNeeded);
+                instructions.emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)),
+                                        instructions[instructions.size() - 1].scopeIndexIfNeeded);
                 break;
             case ILInstruction::DATAINST_VAR_SCOPE_IDX:
-            {
-                std::uint16_t scopeIndex;
-                inFile.read(reinterpret_cast<Byte*>(&scopeIndex), sizeof(std::uint16_t));
-                instructions.emplace_back(inst, 0 ,scopeIndex);
-            }
-            break;
+                instructions.emplace_back(inst, 0, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
+                break;
             
             //Jump cases
             case ILInstruction::JUMP:
@@ -302,24 +306,16 @@ void ByteCodeInterpreter::decodeFile()
             //As they have same operands to decode, just put them here
             case ILInstruction::ITER_HAS_NEXT:
             case ILInstruction::ITER_NEXT:
-            {
-                std::size_t jumpOffset;
-                inFile.read(reinterpret_cast<Byte*>(&jumpOffset), sizeof(std::size_t));
-                instructions.emplace_back(inst, std::move(jumpOffset));
-            }
-            break;
+                instructions.emplace_back(inst, readOperand<std::size_t>(chunkBuffer, chunkBufferIndex));
+                break;
             
             //Iterator
             case ILInstruction::DATAINST_ITER_ID:
-                instructions.emplace_back(inst, std::move(readStringFromFile()));
+                instructions.emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)));
                 break;
             case ILInstruction::ITER_INIT:
-            {
-                std::uint16_t iterParams;
-                inFile.read(reinterpret_cast<Byte*>(&iterParams), sizeof(std::uint16_t));
-                instructions.emplace_back(inst, std::move(iterParams));
-            }
-            break;
+                instructions.emplace_back(inst, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
+                break;
             //Rest of it just read instruction
             default:
                 instructions.emplace_back(inst);
@@ -477,18 +473,6 @@ void ByteCodeInterpreter::interpret()
 }
 
 //-----------------Helper Fuctions-----------------
-std::string& ByteCodeInterpreter::readStringFromFile()
-{
-    //Get length
-    std::size_t length;
-    inFile.read(reinterpret_cast<char*>(&length), sizeof(length));
-
-    currentVariable.resize(length);
-    inFile.read(&currentVariable[0], length);
-
-    return currentVariable;
-}
-
 template<typename T>
 IterPtr ByteCodeInterpreter::getIterator(const std::string& id, IteratorType iterType)
 {
@@ -588,4 +572,76 @@ void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object&& ele
 void ByteCodeInterpreter::setValueToNthFrame(const std::string& id, Object&& elem, const std::uint8_t scopeIndex)
 {
     globalSymbolTable[scopeIndex][id] = std::move(elem);
+}
+
+//File decoding related
+void ByteCodeInterpreter::readFileChunk(std::vector<Byte>& chunkBuffer, std::size_t& chunkBufferIndex)
+{
+    inFile.read(chunkBuffer.data(), FILE_READ_CHUNK_SIZE);
+    chunkBufferIndex = 0;
+}
+
+template<typename T>
+T ByteCodeInterpreter::readOperand(std::vector<Byte>& chunkBuffer, std::size_t& chunkBufferIndex)
+{
+    //IF rest of the stuff is outside of current chunk, handle it
+    if(chunkBufferIndex + sizeof(T) > chunkBuffer.size())
+    {
+        //Read the remaining bytes first
+        const std::size_t remainingBytesInCurrentChunk = (chunkBuffer.size() - chunkBufferIndex);
+        //This many no. of bytes is to be read in the next chunk
+        const std::size_t remainingBytesToRead         = sizeof(T) - remainingBytesInCurrentChunk;
+        //Value to be read to
+        T splitValue;
+        
+        ///STEP1: Read the remaining bytes in current chunk first into the value
+        std::memcpy(&splitValue, chunkBuffer.data() + chunkBufferIndex, remainingBytesInCurrentChunk);
+
+        ///STEP 2: Read the next chunk of file
+        readFileChunk(chunkBuffer, chunkBufferIndex);
+
+        ///STEP 3: Read the remaining bytes residing in this chunk now, from where we left of
+        std::memcpy(reinterpret_cast<char*>(&splitValue) + remainingBytesInCurrentChunk, chunkBuffer.data(), remainingBytesToRead);
+        
+        ///STEP 4: Increment the index
+        chunkBufferIndex += remainingBytesToRead;
+
+        //Finally return it
+        return splitValue;
+    }
+
+    //Read the value from current index
+    T value;
+    std::memcpy(&value, chunkBuffer.data() + chunkBufferIndex, sizeof(T));
+    chunkBufferIndex += sizeof(T);
+
+    return value;
+}
+
+std::string& ByteCodeInterpreter::readStringOperand(std::vector<Byte>& chunkBuffer, std::size_t& chunkBufferIndex)
+{
+    //Read length of string first
+    std::size_t strLength = readOperand<std::size_t>(chunkBuffer, chunkBufferIndex);
+
+    //Resize storage variable
+    currentVariable.resize(strLength);
+    
+    ///Same as readOperand, copied the entire thing
+    if(chunkBufferIndex + strLength > chunkBuffer.size())
+    {
+        const std::size_t remainingBytesInCurrentChunk = (chunkBuffer.size() - chunkBufferIndex);
+        const std::size_t remainingBytesToRead         = strLength - remainingBytesInCurrentChunk;
+
+        std::memcpy(currentVariable.data(), chunkBuffer.data() + chunkBufferIndex, remainingBytesInCurrentChunk);
+        readFileChunk(chunkBuffer, chunkBufferIndex);
+        std::memcpy(currentVariable.data() + remainingBytesInCurrentChunk, chunkBuffer.data(), remainingBytesToRead);
+        
+        chunkBufferIndex += remainingBytesToRead;
+        return currentVariable;
+    }
+    //Else its inside the chunk
+    std::memcpy(currentVariable.data(), chunkBuffer.data() + chunkBufferIndex, strLength);
+    chunkBufferIndex += strLength;
+
+    return currentVariable;
 }

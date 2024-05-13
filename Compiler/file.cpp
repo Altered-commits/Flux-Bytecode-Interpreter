@@ -80,7 +80,7 @@ void FileWriter::writeStringToFile(const std::string& str)
 {
     //Write length of the string first
     std::size_t length = str.size();
-    outFile.write(reinterpret_cast<const char*>(&length), sizeof(length));
+    outFile.write(reinterpret_cast<const Byte*>(&length), sizeof(length));
 
     //Write the actual data now
     outFile.write(str.data(), length);

@@ -428,7 +428,8 @@ ASTPtr Parser::parse_statement()
         {
             TokenType var_type = current_token.token_type;
             advance();
-            function_return_value = parse_variable(var_type, false, 0);
+            //Scope index really doesn't matter for assignment, i'm just putting random values cuz why not
+            function_return_value = parse_variable(var_type, false, UINT16_MAX);
         }
         break;
         case TOKEN_KEYWORD_IF:
@@ -619,7 +620,7 @@ ASTPtr Parser::parse_atom()
             return parse_cast();
         //Welp
         default:
-            printError("ParserError", "Expected some sort of Integer or Float / Unary expression");
+            printError("ParserError", "Expected some sort of Integer / Float / () expression or Cast<>()");
     }
 }
 

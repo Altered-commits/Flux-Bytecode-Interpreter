@@ -119,6 +119,7 @@ void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool is_sub_expr)
             printError("Unsupported Binary Operation. Operation type: ", binary_op_node.op_type);
     }
 }
+
 void ILGenerator::visit(ASTUnaryOp& unary_op_node, bool is_sub_expr)
 {
     unary_op_node.expr->accept(*this, true);
@@ -172,6 +173,7 @@ void ILGenerator::visit(ASTVariableAssign& var_assign_node, bool is_sub_expr)
 
     il_code.emplace_back(inst, var_assign_node.identifier);
 }
+
 void ILGenerator::visit(ASTVariableAccess& var_access_node, bool is_sub_expr)
 {
     std::cout << "ACCESS_VAR " << var_access_node.identifier << '\n'
@@ -396,7 +398,7 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
     //Generate an ITER_INIT instruction passing in the type of iterator and iter data type
     //'Or' them together, then we cast it to integer
     std::uint16_t data = ((std::uint8_t)IteratorType::RANGE_ITERATOR << 8)
-                        | ((std::uint8_t)range_iter_node.evaluateIterType());
+                       | ((std::uint8_t)range_iter_node.evaluateIterType());
 
     std::cout << "ITER_INIT " << data << '\n';
     il_code.emplace_back(ILInstruction::ITER_INIT, std::to_string(data));

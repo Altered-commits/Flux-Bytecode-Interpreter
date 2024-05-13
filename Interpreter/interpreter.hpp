@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <cmath>
+#include <cstring>
 #include <variant>
 #include <vector>
 
@@ -36,7 +37,12 @@ class ByteCodeInterpreter {
             inFile.open(fileName, std::ios_base::binary);
             
             if (!inFile.is_open()) {
-                std::cerr << "[FileReadingError] Error opening file: " << fileName << std::endl;
+                std::cerr << "[FileReadingError]: Error opening file: " << fileName << '\n';
+                std::exit(1);
+            }
+
+            if (!inFile.good() || inFile.fail()) {
+                std::cerr << "[FileReadingError]: File not in good state: " << fileName << '\n';
                 std::exit(1);
             }
         }
@@ -72,8 +78,6 @@ class ByteCodeInterpreter {
         const Object& getValueFromNthFrame(const std::string&, const std::uint8_t);
     
     private: //Helper functions
-        std::string& readStringFromFile();
-        
         template<typename T>
         IterPtr getIterator(const std::string&, IteratorType);
 
@@ -81,6 +85,14 @@ class ByteCodeInterpreter {
         void compare(const T&, const U&, ILInstruction);
 
         void pushInstructionValue(const InstructionValue&);
+
+    //File decoding related
+    private:
+        void readFileChunk(std::vector<Byte>&, std::size_t&);
+        template<typename T>
+        T readOperand(std::vector<Byte>&, std::size_t&);
+        std::string& readStringOperand(std::vector<Byte>&, std::size_t&);
+    
     private:
         std::vector<Instruction> instructions;
         std::string              currentVariable;

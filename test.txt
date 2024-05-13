@@ -1,6 +1,57 @@
 Int i = 0;
 
-For j in 0..4000 {
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
+    i = i + 1;   
+}
+For j in 0..5 {
     i = i + 1;   
 }
 
