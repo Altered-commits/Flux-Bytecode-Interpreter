@@ -3,9 +3,6 @@
 
 #include "interpreter.hpp"
 
-//File decoding related
-#define FILE_READ_CHUNK_SIZE 1024
-
 //Just easier to write 
 #define STACK_REVERSE_ACCESS_ELEM(n) (globalStack[globalStack.size() - n])
 
@@ -253,7 +250,7 @@ void ByteCodeInterpreter::decodeFile()
 
     //Our buffer which will store chunks of file
     std::size_t       chunkBufferIndex;
-    std::vector<Byte> chunkBuffer(FILE_READ_CHUNK_SIZE);
+    std::array<Byte, FILE_READ_CHUNK_SIZE> chunkBuffer;
 
     //Read one chunk initially ofc
     readFileChunk(chunkBuffer, chunkBufferIndex);
@@ -575,14 +572,14 @@ void ByteCodeInterpreter::setValueToNthFrame(const std::string& id, Object&& ele
 }
 
 //File decoding related
-void ByteCodeInterpreter::readFileChunk(std::vector<Byte>& chunkBuffer, std::size_t& chunkBufferIndex)
+void ByteCodeInterpreter::readFileChunk(std::array<Byte, FILE_READ_CHUNK_SIZE>& chunkBuffer, std::size_t& chunkBufferIndex)
 {
     inFile.read(chunkBuffer.data(), FILE_READ_CHUNK_SIZE);
     chunkBufferIndex = 0;
 }
 
 template<typename T>
-T ByteCodeInterpreter::readOperand(std::vector<Byte>& chunkBuffer, std::size_t& chunkBufferIndex)
+T ByteCodeInterpreter::readOperand(std::array<Byte, FILE_READ_CHUNK_SIZE>& chunkBuffer, std::size_t& chunkBufferIndex)
 {
     //IF rest of the stuff is outside of current chunk, handle it
     if(chunkBufferIndex + sizeof(T) > chunkBuffer.size())
@@ -618,7 +615,7 @@ T ByteCodeInterpreter::readOperand(std::vector<Byte>& chunkBuffer, std::size_t& 
     return value;
 }
 
-std::string& ByteCodeInterpreter::readStringOperand(std::vector<Byte>& chunkBuffer, std::size_t& chunkBufferIndex)
+std::string& ByteCodeInterpreter::readStringOperand(std::array<Byte, FILE_READ_CHUNK_SIZE>& chunkBuffer, std::size_t& chunkBufferIndex)
 {
     //Read length of string first
     std::size_t strLength = readOperand<std::size_t>(chunkBuffer, chunkBufferIndex);

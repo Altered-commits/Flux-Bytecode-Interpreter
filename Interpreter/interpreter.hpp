@@ -1,12 +1,16 @@
 #ifndef UNNAMED_INTEPRETER_HPP
 #define UNNAMED_INTEPRETER_HPP
 
+//File decoding related
+#define FILE_READ_CHUNK_SIZE 2048
+
 #include <fstream>
 #include <iostream>
 #include <cmath>
 #include <cstring>
 #include <variant>
 #include <vector>
+#include <array>
 
 #include "..\Common\common.hpp"
 
@@ -88,10 +92,10 @@ class ByteCodeInterpreter {
 
     //File decoding related
     private:
-        void readFileChunk(std::vector<Byte>&, std::size_t&);
+        void readFileChunk(std::array<Byte, FILE_READ_CHUNK_SIZE>&, std::size_t&);
         template<typename T>
-        T readOperand(std::vector<Byte>&, std::size_t&);
-        std::string& readStringOperand(std::vector<Byte>&, std::size_t&);
+        T readOperand(std::array<Byte, FILE_READ_CHUNK_SIZE>&, std::size_t&);
+        std::string& readStringOperand(std::array<Byte, FILE_READ_CHUNK_SIZE>&, std::size_t&);
     
     private:
         std::vector<Instruction> instructions;
