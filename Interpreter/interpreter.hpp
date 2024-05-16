@@ -75,20 +75,19 @@ class ByteCodeInterpreter {
     
     //Symbol table related
     private:
-        void   createSymbolTable();
-        void   destroySymbolTable();
-        void   setValueToTopFrame(const std::string&, Object&&);
-        void   setValueToNthFrame(const std::string&, Object&&, const std::uint8_t);
+        void          createSymbolTable();
+        void          destroySymbolTable();
+        void          destroyMultipleSymbolTables(std::uint16_t);
+        void          setValueToTopFrame(const std::string&, Object&&);
+        void          setValueToNthFrame(const std::string&, Object&&, const std::uint8_t);
         const Object& getValueFromNthFrame(const std::string&, const std::uint8_t);
     
     private: //Helper functions
         template<typename T>
         IterPtr getIterator(const std::string&, IteratorType);
-
         template<typename T, typename U>
-        void compare(const T&, const U&, ILInstruction);
-
-        void pushInstructionValue(const InstructionValue&);
+        void    compare(const T&, const U&, ILInstruction);
+        void    pushInstructionValue(const InstructionValue&);
 
     //File decoding related
     private:

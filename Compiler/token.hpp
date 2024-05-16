@@ -46,6 +46,8 @@ enum TokenType : std::uint8_t {
     TOKEN_KEYWORD_FOR,
     TOKEN_KEYWORD_IN,
     TOKEN_KEYWORD_WHILE,
+    TOKEN_KEYWORD_CONTINUE,
+    TOKEN_KEYWORD_BREAK,
     //, Type
     TOKEN_COMMA,
     //Ternary(? :) Type,

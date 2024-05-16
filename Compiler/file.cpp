@@ -37,6 +37,8 @@ void FileWriter::writeToFile(const std::vector<ILCommand> &commands)
                     writeStringToFile(cmd.operand);
                     break;
                 case DATAINST_VAR_SCOPE_IDX:
+                //Same logic for this instruction as well
+                case DESTROY_MULTIPLE_SYM_TABLES:
                     {
                         //16bit uint value
                         std::uint16_t scopeIndex = std::stoi(cmd.operand);

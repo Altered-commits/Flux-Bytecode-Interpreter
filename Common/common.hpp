@@ -1,3 +1,4 @@
+//Stuff common for both Compiler and Interpreter
 #ifndef UNNAMED_INST_SET
 #define UNNAMED_INST_SET
 
@@ -65,6 +66,7 @@ enum ILInstruction : std::uint8_t
     //Scope symbol table related operation
     CREATE_SYMBOL_TABLE,
     DESTROY_SYMBOL_TABLE,
+    DESTROY_MULTIPLE_SYM_TABLES, //Multiple levels
     //EOF
     END_OF_FILE
 };

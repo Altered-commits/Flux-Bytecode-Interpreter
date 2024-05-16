@@ -23,7 +23,7 @@ void ByteCodeInterpreter::handleIntegerArithmetic(ILInstruction inst)
     auto& elem1 = std::get<int>(globalStack.back());
     auto& elem2 = std::get<int>(STACK_REVERSE_ACCESS_ELEM(2));
 
-    int out;
+    int out = 0;
 
     switch (inst)
     {
@@ -311,6 +311,8 @@ void ByteCodeInterpreter::decodeFile()
                 instructions.emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)));
                 break;
             case ILInstruction::ITER_INIT:
+            //Same for this instruction
+            case ILInstruction::DESTROY_MULTIPLE_SYM_TABLES:
                 instructions.emplace_back(inst, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
                 break;
             //Rest of it just read instruction
@@ -400,9 +402,6 @@ void ByteCodeInterpreter::interpretInstructions()
                 break;
             
             //Iterators
-            // case ILInstruction::DATAINST_ITER_ID:
-            //     setValueToTopFrame(std::get<std::string>(i.value), 0);
-            //     break;
             case ILInstruction::ITER_INIT:
                 handleIteratorInit(std::get<std::uint16_t>(i.value));
                 break;
@@ -425,6 +424,10 @@ void ByteCodeInterpreter::interpretInstructions()
                 break;
             case ILInstruction::DESTROY_SYMBOL_TABLE:
                 destroySymbolTable();
+                break;
+            
+            case ILInstruction::DESTROY_MULTIPLE_SYM_TABLES:
+                destroyMultipleSymbolTables(std::get<std::uint16_t>(i.value));
                 break;
 
             case END_OF_FILE:
@@ -499,7 +502,7 @@ IterPtr ByteCodeInterpreter::getIterator(const std::string& id, IteratorType ite
 template<typename T, typename U>
 void ByteCodeInterpreter::compare(const T& arg1, const U& arg2, ILInstruction inst)
 {
-    int result;
+    int result = 0;
     switch (inst) {
         //Comparision operators
         case ILInstruction::CMP_EQ:
@@ -554,6 +557,12 @@ void ByteCodeInterpreter::createSymbolTable()
 void ByteCodeInterpreter::destroySymbolTable()
 {
     globalSymbolTable.pop_back();   
+}
+
+void ByteCodeInterpreter::destroyMultipleSymbolTables(std::uint16_t scopesToDestroy)
+{
+    for(int i = 0; i < scopesToDestroy; i++)
+        globalSymbolTable.pop_back();
 }
 
 const Object& ByteCodeInterpreter::getValueFromNthFrame(const std::string& id, const std::uint8_t scopeIndex)

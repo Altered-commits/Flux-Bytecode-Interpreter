@@ -1,58 +1,14 @@
-Int i = 0;
+// Compute sum of even numbers between 0 and 11 (0 < x < 11) excluding 4
+Int sum;
 
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
-}
-For j in 0..5 {
-    i = i + 1;   
+For i in 1..11 {
+    If(i == 4) {
+        Continue;
+    }
+    If(i % 2 != 0) {
+        Continue;
+    }
+    sum = sum + i;
 }
 
-i;
+sum;

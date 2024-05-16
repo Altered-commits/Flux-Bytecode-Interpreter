@@ -69,6 +69,8 @@ class Lexer
             {"For", TOKEN_KEYWORD_FOR},
             {"in", TOKEN_KEYWORD_IN},
             {"While", TOKEN_KEYWORD_WHILE},
+            {"Continue", TOKEN_KEYWORD_CONTINUE},
+            {"Break", TOKEN_KEYWORD_BREAK}
         };
 
 };

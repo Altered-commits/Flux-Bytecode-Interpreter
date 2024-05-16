@@ -84,7 +84,7 @@ ASTPtr Parser::parse_for_loop()
     auto iter = parse_iterator(id);
 
     //Add the for identifier to symbol table with the evaluated type of range
-    set_value_to_symbol_table(id, iter, primitive_to_keyword_type.at(iter->evaluateIterType()));
+    set_value_to_top_frame(id, iter, primitive_to_keyword_type.at(iter->evaluateIterType()));
 
     //Now look for code block as usual
     auto for_body = parse_block();
@@ -287,7 +287,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type, std::uint16_t scope_index)
     if(keyword_to_primitive_type.at(var_type) == expr_type)
     {
         //Add it to symbol table and create AST
-        set_value_to_symbol_table(identifier, var_expr, var_type);
+        set_value_to_nth_frame(identifier, var_expr, var_type);
         return create_variable_assign_node(var_type, identifier, std::move(var_expr), true, scope_index);
     }
     //Oops, types dont match, errrorrrrr!
@@ -321,7 +321,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type, std::uint16_t scope_index)
                     var_type, identifier, create_value_node(Token("0", keyword_to_primitive_type.at(var_type))), false, scope_index));
             
             //Now add it to symbol table ig
-            set_value_to_symbol_table(identifier, declarations.back(), var_type);
+            set_value_to_top_frame(identifier, declarations.back(), var_type);
         }
         //We found '=' symbol
         else
@@ -335,7 +335,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type, std::uint16_t scope_index)
             if(keyword_to_primitive_type.at(var_type) == expr_type)
             {
                 //Add it to symbol table and create AST
-                set_value_to_symbol_table(identifier, var_expr, var_type);
+                set_value_to_top_frame(identifier, var_expr, var_type);
                 declarations.emplace_back(create_variable_assign_node(var_type, identifier, std::move(var_expr), false, scope_index));
             }
             else
@@ -435,25 +435,54 @@ ASTPtr Parser::parse_statement()
         case TOKEN_KEYWORD_IF:
         {
             advance();
+
+            CB_PARAMS_START(IS_USING_SYMTBL)
+            SCOPE_DEPTH_INC
             create_scope();
             function_return_value = parse_if_condition();
             destroy_scope();
+            SCOPE_DEPTH_DEC
+            CB_PARAMS_END
         }
         break;
         case TOKEN_KEYWORD_FOR:
         {
             advance();
+
+            CB_PARAMS_START(IS_LOOP | IS_FOR_LOOP)
             create_scope();
             function_return_value = parse_for_loop();
             destroy_scope();
+            CB_PARAMS_END
         }
         break;
         case TOKEN_KEYWORD_WHILE:
         {
             advance();
+
+            CB_PARAMS_START(IS_LOOP)
             create_scope();
             function_return_value = parse_while_loop();
             destroy_scope();
+            CB_PARAMS_END
+        }
+        break;
+        case TOKEN_KEYWORD_CONTINUE:
+        {
+            if(!CB_PARAMS_CHECK_CONDITION(IS_LOOP))
+                printError("ParserError", "'Continue' not allowed outside of a loop");
+            
+            advance();
+            function_return_value = create_continue_node(cb_params, non_loops_scope_depth);
+        }
+        break;
+        case TOKEN_KEYWORD_BREAK:
+        {
+            if(!CB_PARAMS_CHECK_CONDITION(IS_LOOP))
+                printError("ParserError", "'Break' not allowed outside of a loop");
+            
+            advance();
+            function_return_value = create_break_node();
         }
         break;
         default:
@@ -468,7 +497,7 @@ ASTPtr Parser::parse_statement()
     {
         //If the expression makes sense, the user should also end it with a semicolon as well
         if(!match_types(TOKEN_SEMIC))
-            printError("ParserError", "Expected tokens: '+', '-', '*','/' or end the statement with a ';'");
+            printError("ParserError", "Expected some operator or end the statement with a ';'");
 
         advance();
     }
@@ -686,6 +715,16 @@ ASTPtr Parser::create_while_node(ASTPtr&& while_condition, ASTPtr&& while_body)
     return std::make_unique<ASTWhileNode>(std::move(while_condition), std::move(while_body));
 }
 
+ASTPtr Parser::create_continue_node(std::uint8_t continue_params, std::uint16_t scopes_to_destroy)
+{
+    return std::make_unique<ASTContinue>(continue_params, scopes_to_destroy);
+}
+
+ASTPtr Parser::create_break_node()
+{
+    return std::make_unique<ASTBreak>();
+}
+
 //-----------------ACTUALLY Helper functions-----------------
 void Parser::advance()
 {
@@ -703,22 +742,32 @@ bool Parser::match_types(TokenType type)
     return current_token.token_type == type;
 }
 //Scope management
-void Parser::set_value_to_symbol_table(const std::string& id, const ASTPtr& expr, TokenType ttype)
+void Parser::set_value_to_top_frame(const std::string& id, const ASTPtr& expr, TokenType ttype)
 {
     //Get the top most symbol table and 
     temporary_symbol_table.back()[id] = std::make_pair(expr.get(), ttype);
 }
 
+void Parser::set_value_to_nth_frame(const std::string& id, const ASTPtr& expr, TokenType ttype)
+{
+    //Search for the value and set it
+    for (auto it = temporary_symbol_table.rbegin(); it != temporary_symbol_table.rend(); ++it) {
+        auto symbol = it->find(id);
+        if (symbol != it->end()) {
+            symbol->second = std::make_pair(expr.get(), ttype);
+            break;
+        }
+    }
+}
+
 std::pair<TokenType, std::uint16_t> Parser::get_type_from_symbol_table(const std::string& id)
 {
-    //Whatever the value of i is will be the scope index as well
-    for(auto i = temporary_symbol_table.size() - 1; i >= 0; --i)
-    {
-        const auto& table  = temporary_symbol_table[i];
-        const auto& symbol = table.find(id);
-
-        if(symbol != table.end()){
-            return {symbol->second.second, i};
+    //Scope index is basically Vector index, but because we are using iterators, we do some stuff to get index
+    //This loop stuff is weird bruh, cant understand why loops sometimes don't work
+    for (auto it = temporary_symbol_table.rbegin(); it != temporary_symbol_table.rend(); ++it) {
+        auto symbol = it->find(id);
+        if (symbol != it->end()) {
+            return {symbol->second.second, std::distance(it, temporary_symbol_table.rend()) - 1};
         }
     }
     return {TOKEN_UNKNOWN, 0};

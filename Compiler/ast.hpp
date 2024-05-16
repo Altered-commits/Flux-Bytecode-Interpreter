@@ -50,6 +50,8 @@ struct ASTIfNode;
 struct ASTRangeIterator;
 struct ASTForNode;
 struct ASTWhileNode;
+struct ASTContinue;
+struct ASTBreak;
 
 //We will be using the -> Visitor Pattern
 //--------Visitor interface--------
@@ -70,6 +72,8 @@ class ASTVisitorInterface
         virtual void visit(ASTRangeIterator& node, bool)  = 0;
         virtual void visit(ASTForNode& node, bool)        = 0;
         virtual void visit(ASTWhileNode& node, bool)      = 0;
+        virtual void visit(ASTContinue& node, bool)       = 0;
+        virtual void visit(ASTBreak& node, bool)          = 0;
 };
 
 //AST nodes
@@ -395,6 +399,31 @@ struct ASTRangeIterator : public ASTBaseIterator
             return TOKEN_FLOAT;
         
         return TOKEN_INT;
+    }
+};
+
+//--------------BREAK / CONTINUE--------------
+struct ASTContinue : public ASTNode
+{
+    //For loop uses ITER_NEXT to go to next iteration, While loop doesn't
+    std::uint8_t  continue_params;
+    std::uint16_t scopes_to_destroy;
+
+    ASTContinue(std::uint8_t continue_params, std::uint16_t scopes_to_destroy)
+        : continue_params(continue_params), scopes_to_destroy(scopes_to_destroy)
+    {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+};
+
+struct ASTBreak : public ASTNode
+{
+    ASTBreak() {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
     }
 };
 

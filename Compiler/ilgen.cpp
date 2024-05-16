@@ -1,11 +1,5 @@
 #include "ilgen.hpp"
 
-//Force generate these instructions (only to be used in ILGenerator member functions)
-#define SCOPE_START std::cout << "CREATE_SCOPE\n";\
-                    il_code.emplace_back(ILInstruction::CREATE_SYMBOL_TABLE);
-#define SCOPE_END std::cout << "DESTROY_SCOPE\n";\
-                    il_code.emplace_back(ILInstruction::DESTROY_SYMBOL_TABLE);
-
 std::vector<ILCommand>& ILGenerator::generateIL()
 {
     if(!ast_statements.empty())
@@ -245,6 +239,10 @@ void ILGenerator::visit(ASTIfNode& if_node, bool is_sub_expr)
 {
     //Some important variable
     std::vector<std::size_t> elif_jump_locations;
+    
+    //Entire If scope starts from here
+    SCOPE_START
+
     //Generate if condition
     if_node.if_condition->accept(*this, true);
 
@@ -256,8 +254,6 @@ void ILGenerator::visit(ASTIfNode& if_node, bool is_sub_expr)
 
     std::cout << "JUMP_IF_FALSE (If)\n";
 
-    //Entire If scope starts from '{' after If condition till the end of expression
-    SCOPE_START
     //Generate if body
     if_node.if_body->accept(*this, is_sub_expr);
 
@@ -320,6 +316,8 @@ void ILGenerator::visit(ASTForNode& for_node, bool is_sub_expr)
     //We will evaluate range for next, interpreter will do the job of comparing and jumping
     //We just provide the location to jump
     //If the condition is false, it jumps else it doesnt
+    IL_LOOP_START
+
     std::cout << "ITER_HAS_NEXT LOC" << '\n';
     il_code.emplace_back(ILInstruction::ITER_HAS_NEXT);
     
@@ -341,6 +339,7 @@ void ILGenerator::visit(ASTForNode& for_node, bool is_sub_expr)
     std::cout << "IHN LOC: " << il_code.size() << '\n';
 
     //Thats it ig, end the scope
+    IL_LOOP_END
     SCOPE_END
 }
 
@@ -348,6 +347,7 @@ void ILGenerator::visit(ASTWhileNode& while_node, bool is_sub_expr)
 {
     //This is probably the easiest
     SCOPE_START
+    IL_LOOP_START
 
     std::size_t while_condition_location = il_code.size();
     //Generate condition
@@ -369,6 +369,7 @@ void ILGenerator::visit(ASTWhileNode& while_node, bool is_sub_expr)
     std::cout << "LOC: " << il_code.size() << '\n';
     il_code[jump_if_false_location].operand = std::to_string(il_code.size());
 
+    IL_LOOP_END
     SCOPE_END
 }
 
@@ -408,4 +409,25 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
         std::cout << "ITER_RECALC_STEP\n";
         il_code.emplace_back(ILInstruction::ITER_RECALC_STEP);
     }
+}
+
+//------------BREAK / CONTINUE------------
+void ILGenerator::visit(ASTContinue& while_node, bool is_sub_expr)
+{
+    //Few conditions we need to see
+    //1) Is it in a symbol table using thing (loops don't count)? if yes we manually generate instruction to pop it
+    //2) Is it for loop? We use different instruction instead of simple JUMP instruction
+    std::cout << "CONTINUE\n";
+    
+    if(while_node.continue_params & IS_USING_SYMTBL)
+        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYM_TABLES, std::to_string(while_node.scopes_to_destroy));
+
+    (while_node.continue_params & IS_FOR_LOOP) 
+                        ? il_code.emplace_back(ILInstruction::ITER_NEXT, std::to_string(loop_start_positions.back()))
+                        : il_code.emplace_back(ILInstruction::JUMP, std::to_string(loop_start_positions.back()));
+}
+
+void ILGenerator::visit(ASTBreak& while_node, bool is_sub_expr)
+{
+    //Implemented later
 }
