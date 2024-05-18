@@ -395,7 +395,8 @@ struct ASTRangeIterator : public ASTBaseIterator
             return TOKEN_FLOAT;
         if(stop->evaluateExprType() == TOKEN_FLOAT)
             return TOKEN_FLOAT;
-        if(step->evaluateExprType() == TOKEN_FLOAT)
+        //Since step can be nullptr if it's being evaluated during runtime
+        if(step && step->evaluateExprType() == TOKEN_FLOAT)
             return TOKEN_FLOAT;
         
         return TOKEN_INT;
@@ -420,7 +421,13 @@ struct ASTContinue : public ASTNode
 
 struct ASTBreak : public ASTNode
 {
-    ASTBreak() {}
+    //Only thing we check for in parameters is the IS_USING_SYMTBL
+    std::uint8_t  break_params;
+    std::uint16_t scopes_to_destroy;
+
+    ASTBreak(std::uint8_t break_params, std::uint16_t scopes_to_destroy)
+        : break_params(break_params), scopes_to_destroy(scopes_to_destroy)
+    {}
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
         visitor.visit(*this, is_sub_expr);

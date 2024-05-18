@@ -19,8 +19,6 @@ using ParseFuncPtr = std::function<ASTPtr(void)>;
 
 #define CB_PARAMS_END cb_params = prev_params;
 
-#define CB_PARAMS_CHECK_CONDITION(params) (cb_params & params)
-
 //I could have put this code in create and destroy scope function but that would inc/dec this value for loops as well
 //Which i dont want
 #define SCOPE_DEPTH_INC ++non_loops_scope_depth;
@@ -76,7 +74,7 @@ class Parser
         ASTPtr create_for_node(const std::string&, ASTPtr&&, ASTPtr&&);
         ASTPtr create_while_node(ASTPtr&&, ASTPtr&&);
         ASTPtr create_continue_node(std::uint8_t, std::uint16_t);
-        ASTPtr create_break_node();
+        ASTPtr create_break_node(std::uint8_t, std::uint16_t);
 
     //Scope
     private:

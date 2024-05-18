@@ -1,5 +1,17 @@
 #include "ilgen.hpp"
 
+//---------------HELPER FUNCTIONS---------------
+void ILGenerator::handleBreakIfExists(std::size_t jumpOffset)
+{
+    //Not empty = break exists
+    if(!cb_info.back().second.empty())
+        //Update operands for Break instruction
+        for (auto &&i : cb_info.back().second)
+            il_code[i].operand = std::to_string(jumpOffset);
+    //Empty = no break exists, dont do anything
+}
+
+//---------------INTERMEDIATE LANGUAGE -> BYTECODE GENERATOR---------------
 std::vector<ILCommand>& ILGenerator::generateIL()
 {
     if(!ast_statements.empty())
@@ -34,6 +46,7 @@ void ILGenerator::visit(ASTValue& value_node, bool)
                 std::cout << "PUSH_FLOAT ";
                 break;
             default:
+                printError("ASTValue type not supported", value_node.type);
                 break;
         }
         std::cout << value_node.value << '\n';
@@ -52,66 +65,69 @@ void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool is_sub_expr)
                             ||
                             (binary_op_node.left->isPowerOp() || binary_op_node.right->isPowerOp());
 
+    ILInstruction instruction;
+
     switch (binary_op_node.op_type) {
         case TOKEN_PLUS:
             std::cout << (isFloatOperation ? "FADD\n" : "ADD\n");
-            il_code.emplace_back(isFloatOperation ? ILInstruction::FADD : ILInstruction::ADD);
+            instruction = isFloatOperation ? ILInstruction::FADD : ILInstruction::ADD;
             break;
         case TOKEN_MINUS:
             std::cout << (isFloatOperation ? "FSUB\n" : "SUB\n");
-            il_code.emplace_back(isFloatOperation ? ILInstruction::FSUB : ILInstruction::SUB);
+            instruction = isFloatOperation ? ILInstruction::FSUB : ILInstruction::SUB;
             break;
         case TOKEN_MULT:
             std::cout << (isFloatOperation ? "FMUL\n" : "MUL\n");
-            il_code.emplace_back(isFloatOperation ? ILInstruction::FMUL : ILInstruction::MUL);
+            instruction = isFloatOperation ? ILInstruction::FMUL : ILInstruction::MUL;
             break;
         case TOKEN_DIV:
             std::cout << (isFloatOperation ? "FDIV\n" : "DIV\n");
-            il_code.emplace_back(isFloatOperation ? ILInstruction::FDIV : ILInstruction::DIV);
+            instruction = isFloatOperation ? ILInstruction::FDIV : ILInstruction::DIV;
             break;
         case TOKEN_MODULO:
             std::cout << (isFloatOperation ? "FMOD\n" : "MOD\n");
-            il_code.emplace_back(isFloatOperation ? ILInstruction::FMOD : ILInstruction::MOD);
+            instruction = isFloatOperation ? ILInstruction::FMOD : ILInstruction::MOD;
             break;
         case TOKEN_POW:
             std::cout << "POW\n";
-            il_code.emplace_back(ILInstruction::POW);
+            instruction = ILInstruction::POW;
             break;
         case TOKEN_EEQ:
             std::cout << "CMP_EQ\n";
-            il_code.emplace_back(ILInstruction::CMP_EQ);
+            instruction = ILInstruction::CMP_EQ;
             break;
         case TOKEN_NEQ:
             std::cout << "CMP_NEQ\n";
-            il_code.emplace_back(ILInstruction::CMP_NEQ);
+            instruction = ILInstruction::CMP_NEQ;
             break;
         case TOKEN_GT:
             std::cout << "CMP_GT\n";
-            il_code.emplace_back(ILInstruction::CMP_GT);
+            instruction = ILInstruction::CMP_GT;
             break;
         case TOKEN_LT:
             std::cout << "CMP_LT\n";
-            il_code.emplace_back(ILInstruction::CMP_LT);
+            instruction = ILInstruction::CMP_LT;
             break;
         case TOKEN_GTEQ:
             std::cout << "CMP_GTEQ\n";
-            il_code.emplace_back(ILInstruction::CMP_GTEQ);
+            instruction = ILInstruction::CMP_GTEQ;
             break;
         case TOKEN_LTEQ:
             std::cout << "CMP_LTEQ\n";
-            il_code.emplace_back(ILInstruction::CMP_LTEQ);
+            instruction = ILInstruction::CMP_LTEQ;
             break;
         case TOKEN_AND:
             std::cout << "AND\n";
-            il_code.emplace_back(ILInstruction::AND);
+            instruction = ILInstruction::AND;
             break;
         case TOKEN_OR:
             std::cout << "OR\n";
-            il_code.emplace_back(ILInstruction::OR);
+            instruction = ILInstruction::OR;
             break;
         default:
             printError("Unsupported Binary Operation. Operation type: ", binary_op_node.op_type);
     }
+    il_code.emplace_back(instruction);
 }
 
 void ILGenerator::visit(ASTUnaryOp& unary_op_node, bool is_sub_expr)
@@ -338,7 +354,9 @@ void ILGenerator::visit(ASTForNode& for_node, bool is_sub_expr)
     il_code[iter_has_next_location].operand = std::to_string(il_code.size());
     std::cout << "IHN LOC: " << il_code.size() << '\n';
 
-    //Thats it ig, end the scope
+    //Check if break exists in our code and handle it accordingly
+    handleBreakIfExists(il_code.size());
+
     IL_LOOP_END
     SCOPE_END
 }
@@ -368,6 +386,9 @@ void ILGenerator::visit(ASTWhileNode& while_node, bool is_sub_expr)
     //End of loop, update JUMP_IF_FALSE location
     std::cout << "LOC: " << il_code.size() << '\n';
     il_code[jump_if_false_location].operand = std::to_string(il_code.size());
+
+    //Same here
+    handleBreakIfExists(il_code.size());
 
     IL_LOOP_END
     SCOPE_END
@@ -412,22 +433,33 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
 }
 
 //------------BREAK / CONTINUE------------
-void ILGenerator::visit(ASTContinue& while_node, bool is_sub_expr)
+void ILGenerator::visit(ASTContinue& continue_node, bool is_sub_expr)
 {
     //Few conditions we need to see
     //1) Is it in a symbol table using thing (loops don't count)? if yes we manually generate instruction to pop it
-    //2) Is it for loop? We use different instruction instead of simple JUMP instruction
+    //2) Is it in a for loop? We use different instruction instead of simple JUMP instruction
     std::cout << "CONTINUE\n";
     
-    if(while_node.continue_params & IS_USING_SYMTBL)
-        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYM_TABLES, std::to_string(while_node.scopes_to_destroy));
+    if(CB_PARAMS_CHECK_CONDITION(continue_node.continue_params, IS_USING_SYMTBL))
+        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYM_TABLES, std::to_string(continue_node.scopes_to_destroy));
 
-    (while_node.continue_params & IS_FOR_LOOP) 
-                        ? il_code.emplace_back(ILInstruction::ITER_NEXT, std::to_string(loop_start_positions.back()))
-                        : il_code.emplace_back(ILInstruction::JUMP, std::to_string(loop_start_positions.back()));
+    ILInstruction instruction = CB_PARAMS_CHECK_CONDITION(continue_node.continue_params, IS_FOR_LOOP) 
+                                    ? ILInstruction::ITER_NEXT 
+                                    : ILInstruction::JUMP;
+    il_code.emplace_back(instruction, std::to_string(cb_info.back().first));
+
 }
 
-void ILGenerator::visit(ASTBreak& while_node, bool is_sub_expr)
+void ILGenerator::visit(ASTBreak& break_node, bool is_sub_expr)
 {
-    //Implemented later
+    //Where ever you see 'Break', simply push it with no operand, Loops are responsible for updating this operand
+    //Also store its location in 'break_start_positions' vector so Loops know where to find this keyword
+    std::cout << "BREAK\n";
+
+    if(CB_PARAMS_CHECK_CONDITION(break_node.break_params, IS_USING_SYMTBL))
+        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYM_TABLES, std::to_string(break_node.scopes_to_destroy));
+    
+    //Second is where we store all break checkpoints u could say, to be later updated by respective Loops
+    cb_info.back().second.emplace_back(il_code.size());
+    il_code.emplace_back(ILInstruction::JUMP);
 }

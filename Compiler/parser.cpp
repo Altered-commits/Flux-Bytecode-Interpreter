@@ -469,7 +469,7 @@ ASTPtr Parser::parse_statement()
         break;
         case TOKEN_KEYWORD_CONTINUE:
         {
-            if(!CB_PARAMS_CHECK_CONDITION(IS_LOOP))
+            if(!CB_PARAMS_CHECK_CONDITION(cb_params, IS_LOOP))
                 printError("ParserError", "'Continue' not allowed outside of a loop");
             
             advance();
@@ -478,11 +478,11 @@ ASTPtr Parser::parse_statement()
         break;
         case TOKEN_KEYWORD_BREAK:
         {
-            if(!CB_PARAMS_CHECK_CONDITION(IS_LOOP))
+            if(!CB_PARAMS_CHECK_CONDITION(cb_params, IS_LOOP))
                 printError("ParserError", "'Break' not allowed outside of a loop");
             
             advance();
-            function_return_value = create_break_node();
+            function_return_value = create_break_node(cb_params, non_loops_scope_depth);
         }
         break;
         default:
@@ -720,9 +720,9 @@ ASTPtr Parser::create_continue_node(std::uint8_t continue_params, std::uint16_t 
     return std::make_unique<ASTContinue>(continue_params, scopes_to_destroy);
 }
 
-ASTPtr Parser::create_break_node()
+ASTPtr Parser::create_break_node(std::uint8_t break_params, std::uint16_t scopes_to_destroy)
 {
-    return std::make_unique<ASTBreak>();
+    return std::make_unique<ASTBreak>(break_params, scopes_to_destroy);
 }
 
 //-----------------ACTUALLY Helper functions-----------------

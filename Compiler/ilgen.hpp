@@ -18,8 +18,8 @@
 #define SCOPE_END std::cout << "DESTROY_SCOPE\n";\
                     il_code.emplace_back(ILInstruction::DESTROY_SYMBOL_TABLE);
 
-#define IL_LOOP_START loop_start_positions.emplace_back(il_code.size());
-#define IL_LOOP_END   loop_start_positions.pop_back();
+#define IL_LOOP_START cb_info.emplace_back(il_code.size(), std::vector<size_t>{});
+#define IL_LOOP_END   cb_info.pop_back();
 
 struct ILCommand
 {
@@ -55,9 +55,14 @@ class ILGenerator : public ASTVisitorInterface {
         void visit(ASTContinue&, bool);
         void visit(ASTBreak&, bool);
 
+    //Helper function
+    private:
+        void handleBreakIfExists(std::size_t);
+
     private:
     //Temporary solution for Continue / Break
-        std::vector<std::size_t> loop_start_positions;
+        //Pair -> First is for Continue statements, Second is for Break statements
+        std::vector<std::pair<std::size_t, std::vector<std::size_t>>> cb_info;
 
         std::vector<ASTPtr>    ast_statements;
         std::vector<ILCommand> il_code;

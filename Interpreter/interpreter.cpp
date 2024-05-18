@@ -13,7 +13,7 @@ std::vector<Object> globalStack;
 std::vector<std::unordered_map<std::string, Object>> globalSymbolTable;
 
 //Iterator stack
-std::vector<IterPtr> iteratorStack;
+std::vector<IterPtr> globalIteratorStack;
 
 //Think of this as program counter
 std::size_t globalInstructionIndex = 0;
@@ -209,14 +209,14 @@ void ByteCodeInterpreter::handleIteratorInit(std::uint16_t iterParams)
     {
         //TOKEN_INT -> 0
         case 0:
-            iteratorStack.emplace_back(
+            globalIteratorStack.emplace_back(
                 getIterator<int>(iterId, (IteratorType)iterType)
             );
             break;
 
         //TOKEN_FLOAT -> 1
         case 1:
-            iteratorStack.emplace_back(
+            globalIteratorStack.emplace_back(
                 getIterator<float>(iterId, (IteratorType)iterType)
             );
             break;
@@ -227,19 +227,19 @@ void ByteCodeInterpreter::handleIteratorHasNext(std::size_t jumpOffset)
 {
     //Get the currently used iterator and call hasNext()
     //If the next element exists, i mean cool, dont do anything, else jump and pop the iterator from stack
-    if(!iteratorStack.back()->hasNext())
+    if(!globalIteratorStack.back()->hasNext())
     {
         //Set jump location
         globalInstructionIndex = jumpOffset - 1;
         //Pop the iterator
-        iteratorStack.pop_back();
+        globalIteratorStack.pop_back();
     }
 }
 
 void ByteCodeInterpreter::handleIteratorNext(std::size_t jumpOffset)
 {
     //Call next on iterator
-    iteratorStack.back()->next();
+    globalIteratorStack.back()->next();
     //Unconditional jump
     globalInstructionIndex = jumpOffset - 1;
 }
@@ -409,13 +409,13 @@ void ByteCodeInterpreter::interpretInstructions()
                 handleIteratorHasNext(std::get<std::size_t>(i.value));
                 break;
             case ILInstruction::ITER_CURRENT:
-                setValueToTopFrame(iteratorStack.back()->getId(), std::move(iteratorStack.back()->getCurrent()));
+                setValueToTopFrame(globalIteratorStack.back()->getId(), std::move(globalIteratorStack.back()->getCurrent()));
                 break;
             case ILInstruction::ITER_NEXT:
                 handleIteratorNext(std::get<std::size_t>(i.value));
                 break;
             case ILInstruction::ITER_RECALC_STEP:
-                iteratorStack.back()->recalcStep();
+                globalIteratorStack.back()->recalcStep();
                 break;
             
             //Symbol table
@@ -561,8 +561,7 @@ void ByteCodeInterpreter::destroySymbolTable()
 
 void ByteCodeInterpreter::destroyMultipleSymbolTables(std::uint16_t scopesToDestroy)
 {
-    for(int i = 0; i < scopesToDestroy; i++)
-        globalSymbolTable.pop_back();
+    globalSymbolTable.erase(globalSymbolTable.end() - scopesToDestroy, globalSymbolTable.end());
 }
 
 const Object& ByteCodeInterpreter::getValueFromNthFrame(const std::string& id, const std::uint8_t scopeIndex)
