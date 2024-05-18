@@ -67,9 +67,6 @@ enum TokenType : std::uint8_t {
 
 struct Token
 {
-    Token(const char* val, TokenType type)
-        : token_value(val), token_type(type)
-    {}
     Token() = default;
 
     std::string  token_value;

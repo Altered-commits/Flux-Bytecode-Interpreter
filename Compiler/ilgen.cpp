@@ -37,11 +37,11 @@ void ILGenerator::visit(ASTValue& value_node, bool)
         // For constant values, push them onto the stack
         switch (value_node.type)
         {
-            case TOKEN_INT:
+            case EVAL_INT:
                 inst_type = ILInstruction::PUSH_INT;
                 std::cout << "PUSH_INT ";
                 break;
-            case TOKEN_FLOAT:
+            case EVAL_FLOAT:
                 inst_type = ILInstruction::PUSH_FLOAT;
                 std::cout << "PUSH_FLOAT ";
                 break;
@@ -53,7 +53,7 @@ void ILGenerator::visit(ASTValue& value_node, bool)
         il_code.emplace_back(inst_type, value_node.value);
 }
 
-void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool is_sub_expr)
+void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool)
 {
     // For binary operations, recursively generate IL for left and right operands
     binary_op_node.left->accept(*this, true);
@@ -130,7 +130,7 @@ void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool is_sub_expr)
     il_code.emplace_back(instruction);
 }
 
-void ILGenerator::visit(ASTUnaryOp& unary_op_node, bool is_sub_expr)
+void ILGenerator::visit(ASTUnaryOp& unary_op_node, bool)
 {
     unary_op_node.expr->accept(*this, true);
 
@@ -184,7 +184,7 @@ void ILGenerator::visit(ASTVariableAssign& var_assign_node, bool is_sub_expr)
     il_code.emplace_back(inst, var_assign_node.identifier);
 }
 
-void ILGenerator::visit(ASTVariableAccess& var_access_node, bool is_sub_expr)
+void ILGenerator::visit(ASTVariableAccess& var_access_node, bool)
 {
     std::cout << "ACCESS_VAR " << var_access_node.identifier << '\n'
               << "SCOPE_INDEX: " << (int)var_access_node.scope_index << '\n';
@@ -194,20 +194,22 @@ void ILGenerator::visit(ASTVariableAccess& var_access_node, bool is_sub_expr)
     il_code.emplace_back(ILInstruction::ACCESS_VAR, var_access_node.identifier);
 }
 
-void ILGenerator::visit(ASTCastNode& expr, bool is_sub_expr)
+void ILGenerator::visit(ASTCastNode& expr, bool)
 {
     expr.eval_expr->accept(*this, true);
 
     switch (expr.eval_type)
     {
-        case TOKEN_KEYWORD_INT:
+        case EVAL_INT:
             std::cout << "CAST_INT\n";
             il_code.emplace_back(ILInstruction::CAST_INT);    
             break;
-        case TOKEN_KEYWORD_FLOAT:
+        case EVAL_FLOAT:
             std::cout << "CAST_FLOAT\n";
             il_code.emplace_back(ILInstruction::CAST_INT);
             break;
+        default:
+            printError("Unsupported Cast<>() Type: ", expr.eval_type);
     }
 }
 

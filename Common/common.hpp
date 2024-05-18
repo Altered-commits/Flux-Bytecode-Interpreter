@@ -4,6 +4,20 @@
 
 #include <cstdint>
 
+//----------------------EVALUATED TYPES----------------------
+//A tag telling what the expression is going to evaluate to, either an Integer or Float etc
+enum EvalType : std::uint8_t
+{
+    EVAL_INT,
+    EVAL_FLOAT,
+
+    //Expr evaluated to an iterator types
+    EVAL_RANGE_ITER,
+
+    //For unknown types
+    EVAL_UNKNOWN
+};
+
 //----------------------ITERATORS TYPES----------------------
 enum IteratorType : std::uint8_t
 {

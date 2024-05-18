@@ -84,7 +84,7 @@ ASTPtr Parser::parse_for_loop()
     auto iter = parse_iterator(id);
 
     //Add the for identifier to symbol table with the evaluated type of range
-    set_value_to_top_frame(id, iter, primitive_to_keyword_type.at(iter->evaluateIterType()));
+    set_value_to_top_frame(id, iter, iter->evaluateIterType());
 
     //Now look for code block as usual
     auto for_body = parse_block();
@@ -147,7 +147,7 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
     //If we fail to evaluate step value, have runtime do it for us, ONLY if its integer variation
     if(step == nullptr)
     {
-        if(start->evaluateExprType() == TOKEN_INT && stop->evaluateExprType() == TOKEN_INT)
+        if(start->evaluateExprType() == EVAL_INT && stop->evaluateExprType() == EVAL_INT)
         {
             //I will make ilgen send a special instruction to recalculate this
             try {
@@ -155,10 +155,10 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
                 int eval_stop  = preEvaluateAST<int>(*stop);
 
                 //If we are evaluating, might as well use this value instead of whole ass tree
-                start = create_value_node(Token(std::to_string(eval_start).c_str(), TOKEN_INT));
-                stop  = create_value_node(Token(std::to_string(eval_stop).c_str(), TOKEN_INT));
+                start = create_value_node(EVAL_INT, std::to_string(eval_start).c_str());
+                stop  = create_value_node(EVAL_INT, std::to_string(eval_stop).c_str());
 
-                step = std::move(create_value_node(Token(eval_start < eval_stop ? "1" : "-1", TOKEN_INT)));
+                step = std::move(create_value_node(EVAL_INT, (eval_start < eval_stop ? "1" : "-1")));
             }
             //We failed to pre evaluate, dont do anything, just notify for now
             catch(const std::runtime_error& e) {
@@ -172,8 +172,8 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
                 float eval_stop  = preEvaluateAST<float>(*stop);
 
                 //Same here
-                start = create_value_node(Token(std::to_string(eval_start).c_str(), TOKEN_FLOAT));
-                stop  = create_value_node(Token(std::to_string(eval_stop).c_str(), TOKEN_FLOAT));
+                start = create_value_node(EVAL_FLOAT, std::to_string(eval_start).c_str());
+                stop  = create_value_node(EVAL_FLOAT, std::to_string(eval_stop).c_str());
 
                 //Calculate the distance between two values
                 float diff = std::abs(eval_stop - eval_start);
@@ -183,7 +183,7 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
 
                 float interval = 10.0f * std::pow(10, order-1);
 
-                step = std::move(create_value_node(Token(std::to_string(eval_start < eval_stop ? interval : -interval).c_str(), TOKEN_FLOAT)));
+                step = std::move(create_value_node(EVAL_FLOAT, std::to_string(eval_start < eval_stop ? interval : -interval).c_str()));
             }
             catch(const std::runtime_error& e) {
                 printError("ParserError", "Failed to Pre-Evaluate step value for 'RangeIterator', please specify step value (start..stop..step)");
@@ -234,7 +234,7 @@ ASTPtr Parser::parse_cast()
             printError("ParserError", "'Cast' Expected a type after '<', like Int, Float, Etc");
     }
     
-    TokenType eval_type = current_token.token_type;
+    EvalType eval_type = token_to_eval_type.at(current_token.token_type);
     advance();
 
     //Look for '>'
@@ -258,10 +258,10 @@ ASTPtr Parser::parse_cast()
     advance();
 
     //construct and return the dummy ast node
-    return create_cast_dummy_node(eval_type, std::move(expr));
+    return create_cast_node(eval_type, std::move(expr));
 }
 
-ASTPtr Parser::parse_reassignment(TokenType var_type, std::uint16_t scope_index)
+ASTPtr Parser::parse_reassignment(EvalType var_type, std::uint16_t scope_index)
 {
     //Grab the identifier
     if(!match_types(TOKEN_ID))
@@ -269,7 +269,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type, std::uint16_t scope_index)
 
     //Variable name should exist
     std::string identifier = current_token.token_value;
-    if(get_type_from_symbol_table(identifier).first == TOKEN_UNKNOWN)
+    if(get_type_from_symbol_table(identifier).first == EVAL_UNKNOWN)
         printError("ParserError", "Current variable: '", identifier, "' doesn't exist.");
 
     advance();
@@ -284,7 +284,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type, std::uint16_t scope_index)
     auto var_expr  = parse_expr();
     auto expr_type = var_expr->evaluateExprType();
 
-    if(keyword_to_primitive_type.at(var_type) == expr_type)
+    if(var_type == expr_type)
     {
         //Add it to symbol table and create AST
         set_value_to_nth_frame(identifier, var_expr, var_type);
@@ -294,7 +294,7 @@ ASTPtr Parser::parse_reassignment(TokenType var_type, std::uint16_t scope_index)
     printError("ParserError", "Evaluated expression type doesn't match the type pre-assigned to variable: ", identifier);
 }
 
-ASTPtr Parser::parse_declaration(TokenType var_type, std::uint16_t scope_index)
+ASTPtr Parser::parse_declaration(EvalType var_type, std::uint16_t scope_index)
 {
     std::vector<ASTPtr> declarations;
     //We check for multiple variables to assign for
@@ -318,7 +318,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type, std::uint16_t scope_index)
             //Yeah its a bit hard to understand but uhh yeah
             //Bro the compiler is useless af
             declarations.emplace_back(create_variable_assign_node(
-                    var_type, identifier, create_value_node(Token("0", keyword_to_primitive_type.at(var_type))), false, scope_index));
+                    var_type, identifier, create_value_node(var_type, "0"), false, scope_index));
             
             //Now add it to symbol table ig
             set_value_to_top_frame(identifier, declarations.back(), var_type);
@@ -332,7 +332,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type, std::uint16_t scope_index)
             auto var_expr  = parse_expr();
             auto expr_type = var_expr->evaluateExprType();
 
-            if(keyword_to_primitive_type.at(var_type) == expr_type)
+            if(var_type == expr_type)
             {
                 //Add it to symbol table and create AST
                 set_value_to_top_frame(identifier, var_expr, var_type);
@@ -352,7 +352,7 @@ ASTPtr Parser::parse_declaration(TokenType var_type, std::uint16_t scope_index)
     return create_block_node(std::move(declarations));
 }
 
-ASTPtr Parser::parse_variable(TokenType var_type, bool is_reassignment, std::uint16_t scope_index)
+ASTPtr Parser::parse_variable(EvalType var_type, bool is_reassignment, std::uint16_t scope_index)
 {
     switch (is_reassignment)
     {
@@ -426,7 +426,7 @@ ASTPtr Parser::parse_statement()
         case TOKEN_KEYWORD_FLOAT:
         case TOKEN_KEYWORD_INT:
         {
-            TokenType var_type = current_token.token_type;
+            EvalType var_type = token_to_eval_type.at(current_token.token_type);
             advance();
             //Scope index really doesn't matter for assignment, i'm just putting random values cuz why not
             function_return_value = parse_variable(var_type, false, UINT16_MAX);
@@ -514,7 +514,7 @@ ASTPtr Parser::parse_expr()
         if(peek().token_type == TOKEN_EQ)
         {
             auto&&[type, scope_index] = get_type_from_symbol_table(current_token.token_value);
-            if(type == TOKEN_UNKNOWN)
+            if(type == EVAL_UNKNOWN)
                 printError("ParserError", "Undefined variable: ", current_token.token_value);
 
             return parse_variable(type, true, scope_index);
@@ -614,7 +614,7 @@ ASTPtr Parser::parse_atom()
         case TOKEN_ID:
         {
             auto&&[type, scope_index] = get_type_from_symbol_table(current_token.token_value);
-            if(type != TOKEN_UNKNOWN)
+            if(type != EVAL_UNKNOWN)
             {
                 //We need the proper string value
                 auto expr = create_variable_access_node(type, current_token.token_value, scope_index);
@@ -628,9 +628,9 @@ ASTPtr Parser::parse_atom()
         case TOKEN_INT:
         case TOKEN_FLOAT:
         {
-            Token saved_token = current_token;
+            ASTPtr ret_value = create_value_node(token_to_eval_type.at(current_token.token_type), current_token.token_value);
             advance();
-            return create_value_node(saved_token);
+            return std::move(ret_value);
         }
         //( Expression )
         case TOKEN_LPAREN:
@@ -654,9 +654,9 @@ ASTPtr Parser::parse_atom()
 }
 
 //-----------------NODE CREATION-----------------
-ASTPtr Parser::create_value_node(const Token& token)
+ASTPtr Parser::create_value_node(EvalType type, const std::string& value)
 {
-    return std::make_unique<ASTValue>(token.token_type, token.token_value);
+    return std::make_unique<ASTValue>(type, value);
 }
 
 ASTPtr Parser::create_binary_op_node(TokenType op_type, ASTPtr&& left, ASTPtr&& right)
@@ -669,18 +669,18 @@ ASTPtr Parser::create_unary_op_node(TokenType op_type, ASTPtr&& expr)
     return std::make_unique<ASTUnaryOp>(op_type, std::move(expr));
 }
 
-ASTPtr Parser::create_variable_assign_node(TokenType var_type, const std::string& identifier, ASTPtr&& var_expr,
+ASTPtr Parser::create_variable_assign_node(EvalType var_type, const std::string& identifier, ASTPtr&& var_expr,
                                             bool is_reassignment, std::uint16_t scope_index)
 {
     return std::make_unique<ASTVariableAssign>(identifier, var_type, std::move(var_expr), is_reassignment, scope_index);
 }
 
-ASTPtr Parser::create_variable_access_node(TokenType var_type, const std::string& identifier, std::uint16_t scope_index)
+ASTPtr Parser::create_variable_access_node(EvalType var_type, const std::string& identifier, std::uint16_t scope_index)
 {
     return std::make_unique<ASTVariableAccess>(identifier, var_type, scope_index);
 }
 
-ASTPtr Parser::create_cast_dummy_node(TokenType eval_type, ASTPtr&& expr)
+ASTPtr Parser::create_cast_node(EvalType eval_type, ASTPtr&& expr)
 {
     return std::make_unique<ASTCastNode>(eval_type, std::move(expr));
 }
@@ -741,14 +741,15 @@ bool Parser::match_types(TokenType type)
 {
     return current_token.token_type == type;
 }
+
 //Scope management
-void Parser::set_value_to_top_frame(const std::string& id, const ASTPtr& expr, TokenType ttype)
+void Parser::set_value_to_top_frame(const std::string& id, const ASTPtr& expr, EvalType ttype)
 {
     //Get the top most symbol table and 
     temporary_symbol_table.back()[id] = std::make_pair(expr.get(), ttype);
 }
 
-void Parser::set_value_to_nth_frame(const std::string& id, const ASTPtr& expr, TokenType ttype)
+void Parser::set_value_to_nth_frame(const std::string& id, const ASTPtr& expr, EvalType ttype)
 {
     //Search for the value and set it
     for (auto it = temporary_symbol_table.rbegin(); it != temporary_symbol_table.rend(); ++it) {
@@ -760,7 +761,7 @@ void Parser::set_value_to_nth_frame(const std::string& id, const ASTPtr& expr, T
     }
 }
 
-std::pair<TokenType, std::uint16_t> Parser::get_type_from_symbol_table(const std::string& id)
+std::pair<EvalType, std::uint16_t> Parser::get_type_from_symbol_table(const std::string& id)
 {
     //Scope index is basically Vector index, but because we are using iterators, we do some stuff to get index
     //This loop stuff is weird bruh, cant understand why loops sometimes don't work
@@ -770,7 +771,7 @@ std::pair<TokenType, std::uint16_t> Parser::get_type_from_symbol_table(const std
             return {symbol->second.second, std::distance(it, temporary_symbol_table.rend()) - 1};
         }
     }
-    return {TOKEN_UNKNOWN, 0};
+    return {EVAL_UNKNOWN, 0};
 }
 
 //This variation is pretty much used for pre-evaluating expressions
@@ -814,13 +815,16 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
         {
             const auto& value_node = static_cast<const ASTValue&>(node);
 
-            if (value_node.type == TOKEN_FLOAT) {
-                return std::stof(value_node.value); // Convert to float
-            } else {
-                return std::stoi(value_node.value); // Convert to integer
+            switch (value_node.type)
+            {
+                case EVAL_INT:
+                    return std::stoi(value_node.value);
+                case EVAL_FLOAT:
+                    return std::stof(value_node.value);
+                default:
+                    printError("ParserError -> CompileTimeEvaluationError", "Invalid Evaluated type found for ValueNode");
             }
         }
-        break;
         case CTType::Binary:
         {
             const auto& binary_op_node = static_cast<const ASTBinaryOp&>(node);
@@ -873,9 +877,9 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
 
             switch (cast_node.eval_type)
             {
-                case TOKEN_INT:
+                case EVAL_INT:
                     return static_cast<int>(expr);
-                case TOKEN_FLOAT:
+                case EVAL_FLOAT:
                     return static_cast<float>(expr);
                 default:
                     printError("ParserError -> CompileTimeEvaluationError", "Wrong casting type found while pre-evaluating Cast<>");

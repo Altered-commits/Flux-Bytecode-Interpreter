@@ -54,19 +54,19 @@ class Parser
         ASTPtr parse_range_iterator(const std::string&, bool);
         ASTPtr parse_block();
         ASTPtr parse_cast();
-        ASTPtr parse_variable(TokenType, bool, std::uint16_t);
-        ASTPtr parse_reassignment(TokenType, std::uint16_t);
-        ASTPtr parse_declaration(TokenType, std::uint16_t);
+        ASTPtr parse_variable(EvalType, bool, std::uint16_t);
+        ASTPtr parse_reassignment(EvalType, std::uint16_t);
+        ASTPtr parse_declaration(EvalType, std::uint16_t);
         ASTPtr common_binary_op(ParseFuncPtr, TokenType, TokenType, ParseFuncPtr);
         ASTPtr common_binary_op(ParseFuncPtr, std::size_t, ParseFuncPtr);
     
     private:
-        ASTPtr create_value_node(const Token&);
+        ASTPtr create_value_node(EvalType type, const std::string& token);
         ASTPtr create_binary_op_node(TokenType, ASTPtr&&, ASTPtr&&);
         ASTPtr create_unary_op_node(TokenType, ASTPtr&&);
-        ASTPtr create_variable_assign_node(TokenType, const std::string&, ASTPtr&&, bool, std::uint16_t);
-        ASTPtr create_variable_access_node(TokenType, const std::string&, std::uint16_t);
-        ASTPtr create_cast_dummy_node(TokenType, ASTPtr&&);
+        ASTPtr create_variable_assign_node(EvalType, const std::string&, ASTPtr&&, bool, std::uint16_t);
+        ASTPtr create_variable_access_node(EvalType, const std::string&, std::uint16_t);
+        ASTPtr create_cast_node(EvalType, ASTPtr&&);
         ASTPtr create_block_node(std::vector<ASTPtr>&&);
         ASTPtr create_ternary_op_node(ASTPtr&&, ASTPtr&&, ASTPtr&&);
         ASTPtr create_if_node(ASTPtr&&, ASTPtr&&, std::vector<std::pair<ASTPtr, ASTPtr>>&&, ASTPtr&&);
@@ -78,13 +78,13 @@ class Parser
 
     //Scope
     private:
-        void                                set_value_to_top_frame(const std::string&, const ASTPtr&, TokenType);
-        void                                set_value_to_nth_frame(const std::string&, const ASTPtr&, TokenType);
-        std::pair<TokenType, std::uint16_t> get_type_from_symbol_table(const std::string&);
-        ASTRawPtr                           get_expr_from_symbol_table(const std::string&); //Pre-Evaluation only
-        bool                                find_variable_from_current_scope(const std::string&);
-        void                                create_scope();
-        void                                destroy_scope();
+        void                               set_value_to_top_frame(const std::string&, const ASTPtr&, EvalType);
+        void                               set_value_to_nth_frame(const std::string&, const ASTPtr&, EvalType);
+        std::pair<EvalType, std::uint16_t> get_type_from_symbol_table(const std::string&);
+        ASTRawPtr                          get_expr_from_symbol_table(const std::string&); //Pre-Evaluation only
+        bool                               find_variable_from_current_scope(const std::string&);
+        void                               create_scope();
+        void                               destroy_scope();
 
     //Compile time Evaluator
     private:
@@ -107,17 +107,14 @@ class Parser
         //Maybe the real statements were the friends we parsed along the way
         std::vector<ASTPtr> statements;
         //Temporary symbol table for variables, stack based scoping mechanism
-        std::vector<std::unordered_map<std::string, std::pair<ASTRawPtr, TokenType>>> temporary_symbol_table;
+        std::vector<std::unordered_map<std::string, std::pair<ASTRawPtr, EvalType>>> temporary_symbol_table;
 
-        //Keyword to primitive type mapper, cuz i dont know how to properly optimize and code
-        const std::unordered_map<TokenType, TokenType> keyword_to_primitive_type = {
-            {TOKEN_KEYWORD_FLOAT, TOKEN_FLOAT},
-            {TOKEN_KEYWORD_INT, TOKEN_INT},
-        };
-        //Primitive to keyword mapper cuz i again dont know how to code
-        const std::unordered_map<TokenType, TokenType> primitive_to_keyword_type = {
-            {TOKEN_FLOAT, TOKEN_KEYWORD_FLOAT},
-            {TOKEN_INT, TOKEN_KEYWORD_INT},
+        //Token type to Eval type converter
+        const std::unordered_map<TokenType, EvalType> token_to_eval_type = {
+            {TOKEN_INT,           EVAL_INT},
+            {TOKEN_KEYWORD_INT,   EVAL_INT},
+            {TOKEN_FLOAT,         EVAL_FLOAT},
+            {TOKEN_KEYWORD_FLOAT, EVAL_FLOAT}
         };
 };
 

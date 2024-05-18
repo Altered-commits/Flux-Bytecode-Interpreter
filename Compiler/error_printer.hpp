@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include "lexer.hpp"
+#include "..\Common\common.hpp" //EvalType
 
 static void printError(std::string errorSection, std::string errorMsg)
 {
@@ -32,9 +33,14 @@ static void printError(std::string errorSection, const std::string& errorMsg, Ar
 }
 
 //For ILGen errors specifically, normally there shouldnt be a single error in this
-static void printError(std::string errorMsg, TokenType operandType)
+static void printError(std::string errorMsg, EvalType type)
 {
-    std::cout << "[ILGeneratorError]: " << errorMsg << operandType << '\n';
+    std::cout << "[ILGeneratorError]: " << errorMsg << (int)type << '\n';
+    std::exit(1);
+}
+static void printError(std::string errorMsg, TokenType type)
+{
+    std::cout << "[ILGeneratorError]: " << errorMsg << (int)type << '\n';
     std::exit(1);
 }
 

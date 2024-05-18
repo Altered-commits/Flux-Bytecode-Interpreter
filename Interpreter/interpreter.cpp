@@ -205,17 +205,15 @@ void ByteCodeInterpreter::handleIteratorInit(std::uint16_t iterParams)
     std::uint8_t identType = (iterParams & 0x00FF);
 
     //Get iterator of that type
-    switch (identType)
+    switch ((EvalType)identType)
     {
-        //TOKEN_INT -> 0
-        case 0:
+        case EVAL_INT:
             globalIteratorStack.emplace_back(
                 getIterator<int>(iterId, (IteratorType)iterType)
             );
             break;
 
-        //TOKEN_FLOAT -> 1
-        case 1:
+        case EVAL_FLOAT:
             globalIteratorStack.emplace_back(
                 getIterator<float>(iterId, (IteratorType)iterType)
             );

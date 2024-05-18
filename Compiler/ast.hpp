@@ -3,7 +3,7 @@
 
 #include <memory>
 #include <string>
-#include "token.hpp"
+#include "..\Common\common.hpp"
 #include "error_printer.hpp"
 
 //Forward declare cuz the below std::unique_ptr is going to cry if not done
@@ -12,7 +12,7 @@ struct ASTNode;
 using ASTPtr    = std::unique_ptr<ASTNode>;
 using ASTRawPtr = ASTNode*;
 
-//BTW, this may look useless right now but trust me its important for same precedence operators
+//This thing will at max work for enum values under 64, cuz std::size_t aint 128bit
 constexpr std::size_t comparisionTypeMask = (1ULL << static_cast<std::size_t>(TOKEN_EEQ))
                                     | (1ULL << static_cast<std::size_t>(TOKEN_NEQ))
                                     | (1ULL << static_cast<std::size_t>(TOKEN_GT))
@@ -92,17 +92,17 @@ struct ASTNode
     virtual CTType getType() const { return CTType::NA; }
 
     //Expression evaluation for final type (variables and range)
-    virtual TokenType evaluateExprType() const { return TOKEN_UNKNOWN; }
-    virtual TokenType evaluateIterType() const { return TOKEN_UNKNOWN; }
+    virtual EvalType evaluateExprType() const { return EVAL_UNKNOWN; }
+    virtual EvalType evaluateIterType() const { return EVAL_UNKNOWN; }
 };
 
 //-----------------------------AST Types-----------------------------
 struct ASTValue : public ASTNode
 {
-    TokenType   type;
+    EvalType    type;
     std::string value;
 
-    ASTValue(TokenType type, const std::string& value)
+    ASTValue(EvalType type, const std::string& value)
         : type(type), value(value)
     {}
 
@@ -111,13 +111,13 @@ struct ASTValue : public ASTNode
     }
 
     bool isFloat() const override {
-        return type == TOKEN_FLOAT;
+        return type == EVAL_FLOAT;
     }
     bool isPowerOp() const override {
         return false;
     }
 
-    TokenType evaluateExprType() const override {
+    EvalType evaluateExprType() const override {
         return type;
     }
 
@@ -148,24 +148,24 @@ struct ASTBinaryOp : public ASTNode
         return op_type == TOKEN_POW || left->isPowerOp() || right->isPowerOp();
     }
 
-    TokenType evaluateExprType() const override {
+    EvalType evaluateExprType() const override {
         switch (op_type)
         {
             case TOKEN_POW:
-                return TOKEN_FLOAT;
+                return EVAL_FLOAT;
             
             case TOKEN_OR:
             case TOKEN_AND:
-                return TOKEN_INT;
+                return EVAL_INT;
         }
         
         if(SAME_PRECEDENCE_MASK_CHECK(op_type, comparisionTypeMask))
-            return TOKEN_INT;
+            return EVAL_INT;
 
-        if(left->evaluateExprType() == TOKEN_FLOAT || right->evaluateExprType() == TOKEN_FLOAT)
-            return TOKEN_FLOAT;
+        if(left->evaluateExprType() == EVAL_FLOAT || right->evaluateExprType() == EVAL_FLOAT)
+            return EVAL_FLOAT;
 
-        return TOKEN_INT;
+        return EVAL_INT;
     }
 
     //Tag
@@ -194,9 +194,9 @@ struct ASTUnaryOp : public ASTNode
         return expr->isPowerOp();
     }
 
-    TokenType evaluateExprType() const override {
+    EvalType evaluateExprType() const override {
         if(op_type == TOKEN_NOT)
-            return TOKEN_INT;
+            return EVAL_INT;
         return expr->evaluateExprType();
     }
 
@@ -210,12 +210,12 @@ struct ASTVariableAssign : public ASTNode
 {
     std::string  identifier;
     ASTPtr       expr;
-    TokenType    var_type;
+    EvalType     var_type;
     bool         is_reassignment;
     //Same here as VariableAccess
     std::uint16_t scope_index;
 
-    ASTVariableAssign(const std::string& identifier, TokenType type, ASTPtr&& expr, bool is_reassignment, std::uint16_t scope_index)
+    ASTVariableAssign(const std::string& identifier, EvalType type, ASTPtr&& expr, bool is_reassignment, std::uint16_t scope_index)
         : identifier(identifier), var_type(type), expr(std::move(expr)), is_reassignment(is_reassignment), scope_index(scope_index)
     {}
 
@@ -224,25 +224,25 @@ struct ASTVariableAssign : public ASTNode
     }
 
     bool isFloat() const override {
-        return expr->isFloat();
+        return var_type == EVAL_FLOAT;
     }
     bool isPowerOp() const override {
         return expr->isPowerOp();
     }
 
-    TokenType evaluateExprType() const override {
-        return var_type == TOKEN_KEYWORD_FLOAT ? TOKEN_FLOAT : TOKEN_INT;
+    EvalType evaluateExprType() const override {
+        return var_type;
     }
 };
 
 struct ASTVariableAccess : public ASTNode
 {
-    std::string  identifier;
-    TokenType    var_type;
+    std::string identifier;
+    EvalType    var_type;
     //Maintain the scope in which the variable is present
     std::uint16_t scope_index;
 
-    ASTVariableAccess(const std::string& identifier, TokenType type, std::uint16_t scope_index)
+    ASTVariableAccess(const std::string& identifier, EvalType type, std::uint16_t scope_index)
         : identifier(identifier), var_type(type), scope_index(scope_index)
     {}
 
@@ -251,11 +251,11 @@ struct ASTVariableAccess : public ASTNode
     }
 
     bool isFloat() const override {
-        return var_type == TOKEN_KEYWORD_FLOAT;
+        return var_type == EVAL_FLOAT;
     }
 
-    TokenType evaluateExprType() const override {
-        return var_type == TOKEN_KEYWORD_FLOAT ? TOKEN_FLOAT : TOKEN_INT;
+    EvalType evaluateExprType() const override {
+        return var_type;
     }
 
     //Tag
@@ -266,10 +266,10 @@ struct ASTVariableAccess : public ASTNode
 
 struct ASTCastNode : public ASTNode
 {
-    TokenType eval_type;
-    ASTPtr    eval_expr;
+    EvalType eval_type;
+    ASTPtr   eval_expr;
 
-    ASTCastNode(TokenType eval_type, ASTPtr&& expr)
+    ASTCastNode(EvalType eval_type, ASTPtr&& expr)
         : eval_type(eval_type), eval_expr(std::move(expr))
     {}
 
@@ -278,11 +278,11 @@ struct ASTCastNode : public ASTNode
     }
 
     bool isFloat() const override {
-        return eval_type == TOKEN_KEYWORD_FLOAT;
+        return eval_type == EVAL_FLOAT;
     }
 
-    TokenType evaluateExprType() const override {
-        return eval_type == TOKEN_KEYWORD_FLOAT ? TOKEN_FLOAT : TOKEN_INT;
+    EvalType evaluateExprType() const override {
+        return eval_type;
     }
 
     //Tag
@@ -331,10 +331,10 @@ struct ASTTernaryOp : public ASTNode
         return true_expr->isPowerOp() || false_expr->isPowerOp();
     }
 
-    TokenType evaluateExprType() const override {
+    EvalType evaluateExprType() const override {
         //If this isnt float, then just return whatver the other expression is
-        if (true_expr->evaluateExprType() == TOKEN_FLOAT) {
-            return TOKEN_FLOAT;
+        if (true_expr->evaluateExprType() == EVAL_FLOAT) {
+            return EVAL_FLOAT;
         }
         return false_expr->evaluateExprType();
     }
@@ -386,20 +386,17 @@ struct ASTRangeIterator : public ASTBaseIterator
         visitor.visit(*this, is_sub_expr);
     }
 
-    TokenType evaluateExprType() const override {
-        return TOKEN_RANGE_ITER;
+    EvalType evaluateExprType() const override {
+        return EVAL_RANGE_ITER;
     }
 
-    TokenType evaluateIterType() const override {
-        if (start->evaluateExprType() == TOKEN_FLOAT)
-            return TOKEN_FLOAT;
-        if(stop->evaluateExprType() == TOKEN_FLOAT)
-            return TOKEN_FLOAT;
-        //Since step can be nullptr if it's being evaluated during runtime
-        if(step && step->evaluateExprType() == TOKEN_FLOAT)
-            return TOKEN_FLOAT;
+    EvalType evaluateIterType() const override {
+        //Since step can be nullptr if it's being evaluated during runtime (Only in integer variation)
+        if(step == nullptr)
+            return EVAL_INT;
         
-        return TOKEN_INT;
+        //Whatever the step value type is will be the evaluated iter type as well
+        return step->evaluateExprType();
     }
 };
 

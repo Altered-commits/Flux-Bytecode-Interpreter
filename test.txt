@@ -1,22 +1,6 @@
-// Generate prime numbers up to a given limit
-Int limit = 20,
-    is_prime,
-    prime_count = 0,
-    num = 2;
+Int sum;
 
-While (num < limit) {
-    is_prime = 1;
-    Int i = 2;
-    While (i < num) {
-        If (num % i == 0) {
-            is_prime = 0;
-            Break;
-        }
-        i = i + 1;
-    }
-    If (is_prime == 1) {
-        prime_count = prime_count + 1;
-    }
-    num = num + 1;
+For i in 0..4000 {
+   sum = sum + 1;
 }
-prime_count;  // Return the count of prime numbers found
+sum;
