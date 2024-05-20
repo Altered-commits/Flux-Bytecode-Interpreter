@@ -746,7 +746,7 @@ bool Parser::match_types(TokenType type)
 void Parser::set_value_to_top_frame(const std::string& id, const ASTPtr& expr, EvalType ttype)
 {
     //Get the top most symbol table and 
-    temporary_symbol_table.back()[id] = std::make_pair(expr.get(), ttype);
+    temporary_symbol_table.back().emplace(id, std::make_pair(expr.get(), ttype));
 }
 
 void Parser::set_value_to_nth_frame(const std::string& id, const ASTPtr& expr, EvalType ttype)

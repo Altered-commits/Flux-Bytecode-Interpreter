@@ -1,6 +1,31 @@
-Int sum;
+Int start = 2;
+Int end = 20;
+Int count = 0;
+Int i = start;
 
-For i in 0..4000 {
-   sum = sum + 1;
+While (i <= end) {
+    Int isPrime = 1;
+    If (i == 2) {
+        count = count + 1;
+        i = i + 1;
+        Continue;
+    }
+    If (i < 2) {
+        i = i + 1;
+        Continue;
+    }
+    Int j = 2;
+    While (j <= i / 2) {
+        If (i % j == 0) {
+            isPrime = 0;
+            Break;
+        }
+        j = j + 1;
+    }
+    If (isPrime == 1) {
+        count = count + 1;
+    }
+    i = i + 1;
 }
-sum;
+
+count;

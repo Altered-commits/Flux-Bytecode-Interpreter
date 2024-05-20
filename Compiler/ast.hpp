@@ -1,3 +1,8 @@
+/* ast.hpp is responsible for few things,
+ * 1) Defining nodes for different expressions ofc
+ * 2) Performing a sort of semantic analysis as well
+ * example: can left expr can be added to right expr? if yes what is the resultant type
+*/
 #ifndef UNNAMED_AST_HPP
 #define UNNAMED_AST_HPP
 
@@ -5,6 +10,7 @@
 #include <string>
 #include "..\Common\common.hpp"
 #include "error_printer.hpp"
+#include "type_checker.hpp"
 
 //Forward declare cuz the below std::unique_ptr is going to cry if not done
 struct ASTNode;
@@ -149,23 +155,13 @@ struct ASTBinaryOp : public ASTNode
     }
 
     EvalType evaluateExprType() const override {
-        switch (op_type)
-        {
-            case TOKEN_POW:
-                return EVAL_FLOAT;
-            
-            case TOKEN_OR:
-            case TOKEN_AND:
-                return EVAL_INT;
-        }
+        auto& evaluator       = validateTypeForOperator.at(op_type);
+        const auto& eval_type = evaluator.find(std::make_pair(left->evaluateExprType(), right->evaluateExprType()));
+
+        if(eval_type == evaluator.end())
+            printError("ASTError -> Binary Operation", "No operator overload defined for the expression on left and right of operator");
         
-        if(SAME_PRECEDENCE_MASK_CHECK(op_type, comparisionTypeMask))
-            return EVAL_INT;
-
-        if(left->evaluateExprType() == EVAL_FLOAT || right->evaluateExprType() == EVAL_FLOAT)
-            return EVAL_FLOAT;
-
-        return EVAL_INT;
+        return eval_type->second;
     }
 
     //Tag
@@ -195,9 +191,13 @@ struct ASTUnaryOp : public ASTNode
     }
 
     EvalType evaluateExprType() const override {
-        if(op_type == TOKEN_NOT)
-            return EVAL_INT;
-        return expr->evaluateExprType();
+        auto& evaluator       = validateUnaryTypeForOperator.at(op_type);
+        const auto& eval_type = evaluator.find(expr->evaluateExprType());
+
+        if(eval_type == evaluator.end())
+            printError("ASTError -> Unary Operation", "No operator overload defined for the expression given to Unary Operator");
+        
+        return eval_type->second;
     }
 
     //Tag
