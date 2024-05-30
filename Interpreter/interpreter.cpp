@@ -310,7 +310,7 @@ void ByteCodeInterpreter::decodeFile()
                 break;
             case ILInstruction::ITER_INIT:
             //Same for this instruction
-            case ILInstruction::DESTROY_MULTIPLE_SYM_TABLES:
+            case ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES:
                 instructions.emplace_back(inst, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
                 break;
             //Rest of it just read instruction
@@ -424,7 +424,7 @@ void ByteCodeInterpreter::interpretInstructions()
                 destroySymbolTable();
                 break;
             
-            case ILInstruction::DESTROY_MULTIPLE_SYM_TABLES:
+            case ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES:
                 destroyMultipleSymbolTables(std::get<std::uint16_t>(i.value));
                 break;
 

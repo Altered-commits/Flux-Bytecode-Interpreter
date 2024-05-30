@@ -736,7 +736,6 @@ Token Parser::peek()
     return lex.peek_next_token();
 }
 
-//can be used for error handling later
 bool Parser::match_types(TokenType type)
 {
     return current_token.token_type == type;

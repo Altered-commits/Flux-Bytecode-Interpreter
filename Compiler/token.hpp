@@ -59,10 +59,6 @@ enum TokenType : std::uint8_t {
     //.. and ... (Range and Ellipsis)
     TOKEN_RANGE,
     TOKEN_ELLIPSIS,
-    //Iterator Types
-    TOKEN_RANGE_ITER,
-    //Idk
-    TOKEN_UNKNOWN
 };
 
 struct Token

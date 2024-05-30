@@ -8,7 +8,7 @@
 #include "lexer.hpp"
 #include "..\Common\common.hpp" //EvalType
 
-static void printError(std::string errorSection, std::string errorMsg)
+static void printError(const std::string& errorSection, const std::string& errorMsg)
 {
     auto [cur_line, cur_col] = Lexer::getLineColCount();
     std::cout << "[" << errorSection << "]: "
@@ -18,7 +18,7 @@ static void printError(std::string errorSection, std::string errorMsg)
 }
 
 template<typename... Args>
-static void printError(std::string errorSection, const std::string& errorMsg, Args&&... args)
+static void printError(const std::string& errorSection, const std::string& errorMsg, Args&&... args)
 {
     auto [cur_line, cur_col] = Lexer::getLineColCount();
     std::cout << "[" << errorSection << "]: "
@@ -33,19 +33,19 @@ static void printError(std::string errorSection, const std::string& errorMsg, Ar
 }
 
 //For ILGen errors specifically, normally there shouldnt be a single error in this
-static void printError(std::string errorMsg, EvalType type)
+static void printError(const std::string& errorMsg, EvalType type)
 {
     std::cout << "[ILGeneratorError]: " << errorMsg << (int)type << '\n';
     std::exit(1);
 }
-static void printError(std::string errorMsg, TokenType type)
+static void printError(const std::string& errorMsg, TokenType type)
 {
     std::cout << "[ILGeneratorError]: " << errorMsg << (int)type << '\n';
     std::exit(1);
 }
 
 //I might as well have this print warnings as well ig
-static void printWarning(std::string warningSection, const std::string& warningMsg)
+static void printWarning(const std::string& warningSection, const std::string& warningMsg)
 {
     auto [cur_line, cur_col] = Lexer::getLineColCount();
 

@@ -155,7 +155,7 @@ struct ASTBinaryOp : public ASTNode
     }
 
     EvalType evaluateExprType() const override {
-        auto& evaluator       = validateTypeForOperator.at(op_type);
+        auto& evaluator       = typeCheckerForCommonOps.at(op_type);
         const auto& eval_type = evaluator.find(std::make_pair(left->evaluateExprType(), right->evaluateExprType()));
 
         if(eval_type == evaluator.end())
@@ -191,7 +191,7 @@ struct ASTUnaryOp : public ASTNode
     }
 
     EvalType evaluateExprType() const override {
-        auto& evaluator       = validateUnaryTypeForOperator.at(op_type);
+        auto& evaluator       = typeCheckerForUnaryOps.at(op_type);
         const auto& eval_type = evaluator.find(expr->evaluateExprType());
 
         if(eval_type == evaluator.end())

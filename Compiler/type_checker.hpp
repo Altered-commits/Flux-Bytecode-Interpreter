@@ -11,11 +11,11 @@
 #include "..\Common\common.hpp" //For EvalType
 
 //Easier way ig
-#define BINARY_OP_MAPPER(Type1, Type2, EvaluatedType) {std::make_pair(Type1, Type2), EvaluatedType}
-#define COMPARISION_OP_MAPPER(Type1, Type2)           {std::make_pair(Type1, Type2), EVAL_INT}
+#define BINARY_OP_MAPPER(Type1, Type2, EvaluatedType)  {std::make_pair(Type1, Type2), EvaluatedType}
+#define COMPARISION_OR_LOGICAL_OP_MAPPER(Type1, Type2) {std::make_pair(Type1, Type2), EVAL_INT}
 
-#define ADD_BINARY_OP_CHECKER(Type)      {Type, binOpValidTokens}
-#define ADD_COMPARISION_OP_CHECKER(Type) {Type, comparisionAndLogicalValidTokens}
+#define ADD_BINARY_OP_CHECKER(Type)                 {Type, binaryOpTypeEvaluator}
+#define ADD_COMPARISION_OR_LOGICAL_OP_CHECKER(Type) {Type, comparisionAndLogicalOpTypeEvaluator}
 
 //Hasher for Pair<EvalType, EvalType> using FNV-1a
 struct PairHasher {
@@ -25,9 +25,9 @@ struct PairHasher {
 
         uint64_t hash_value = 14695981039346656037ull; // FNV-1a offset basis
 
-        hash_value ^= static_cast<uint64_t>(p.first);
+        hash_value ^= static_cast<std::uint64_t>(p.first);
         hash_value *= prime1;
-        hash_value ^= static_cast<uint64_t>(p.second);
+        hash_value ^= static_cast<std::uint64_t>(p.second);
         hash_value *= prime2;
 
         // Mix bits to distribute more evenly
@@ -51,7 +51,7 @@ using UnaryTypeChecker = const std::unordered_map<TokenType, UnaryTypeEvaluator>
 
 //--------------TYPE EVALUATOR--------------
 //For Binary operations
-TypeEvaluator binOpValidTokens = {
+TypeEvaluator binaryOpTypeEvaluator = {
     //For Int
     BINARY_OP_MAPPER(EVAL_INT, EVAL_INT, EVAL_INT),
     BINARY_OP_MAPPER(EVAL_INT, EVAL_FLOAT, EVAL_FLOAT),
@@ -61,29 +61,29 @@ TypeEvaluator binOpValidTokens = {
 };
 
 //For Comparision and Logical operations
-TypeEvaluator comparisionAndLogicalValidTokens = {
+TypeEvaluator comparisionAndLogicalOpTypeEvaluator = {
     //For Int
-    COMPARISION_OP_MAPPER(EVAL_INT, EVAL_INT),
-    COMPARISION_OP_MAPPER(EVAL_INT, EVAL_FLOAT),
+    COMPARISION_OR_LOGICAL_OP_MAPPER(EVAL_INT, EVAL_INT),
+    COMPARISION_OR_LOGICAL_OP_MAPPER(EVAL_INT, EVAL_FLOAT),
     //For Float
-    COMPARISION_OP_MAPPER(EVAL_FLOAT, EVAL_INT),
-    COMPARISION_OP_MAPPER(EVAL_FLOAT, EVAL_FLOAT)
+    COMPARISION_OR_LOGICAL_OP_MAPPER(EVAL_FLOAT, EVAL_INT),
+    COMPARISION_OR_LOGICAL_OP_MAPPER(EVAL_FLOAT, EVAL_FLOAT)
 };
 
 //For Unary '!' operations
-UnaryTypeEvaluator unaryNotValidTokens = {
+UnaryTypeEvaluator unaryNotOpTypeEvaluator = {
     {EVAL_INT,   EVAL_INT},
     {EVAL_FLOAT, EVAL_INT}
 };
 
 //For Unary '-' operations
-UnaryTypeEvaluator unaryMinusValidTokens = {
+UnaryTypeEvaluator unaryMinusOpTypeEvaluator = {
     {EVAL_INT,   EVAL_INT},
     {EVAL_FLOAT, EVAL_FLOAT}
 };
 
 //--------------TYPE CHECKER--------------
-TypeChecker validateTypeForOperator = {
+TypeChecker typeCheckerForCommonOps = {
     ADD_BINARY_OP_CHECKER(TOKEN_PLUS),
     ADD_BINARY_OP_CHECKER(TOKEN_MINUS),
     ADD_BINARY_OP_CHECKER(TOKEN_MULT),
@@ -92,20 +92,20 @@ TypeChecker validateTypeForOperator = {
     ADD_BINARY_OP_CHECKER(TOKEN_POW),
 
     //Comparision / Logical Operator
-    ADD_COMPARISION_OP_CHECKER(TOKEN_LT),
-    ADD_COMPARISION_OP_CHECKER(TOKEN_GT),
-    ADD_COMPARISION_OP_CHECKER(TOKEN_LTEQ),
-    ADD_COMPARISION_OP_CHECKER(TOKEN_GTEQ),
-    ADD_COMPARISION_OP_CHECKER(TOKEN_EEQ),
-    ADD_COMPARISION_OP_CHECKER(TOKEN_NEQ),
-    ADD_COMPARISION_OP_CHECKER(TOKEN_AND),
-    ADD_COMPARISION_OP_CHECKER(TOKEN_OR)
+    ADD_COMPARISION_OR_LOGICAL_OP_CHECKER(TOKEN_LT),
+    ADD_COMPARISION_OR_LOGICAL_OP_CHECKER(TOKEN_GT),
+    ADD_COMPARISION_OR_LOGICAL_OP_CHECKER(TOKEN_LTEQ),
+    ADD_COMPARISION_OR_LOGICAL_OP_CHECKER(TOKEN_GTEQ),
+    ADD_COMPARISION_OR_LOGICAL_OP_CHECKER(TOKEN_EEQ),
+    ADD_COMPARISION_OR_LOGICAL_OP_CHECKER(TOKEN_NEQ),
+    ADD_COMPARISION_OR_LOGICAL_OP_CHECKER(TOKEN_AND),
+    ADD_COMPARISION_OR_LOGICAL_OP_CHECKER(TOKEN_OR)
 };
 
 //Additional type checker for Unary Operations
-UnaryTypeChecker validateUnaryTypeForOperator = {
-    {TOKEN_MINUS, unaryMinusValidTokens},
-    {TOKEN_NOT,   unaryNotValidTokens}
+UnaryTypeChecker typeCheckerForUnaryOps = {
+    {TOKEN_MINUS, unaryMinusOpTypeEvaluator},
+    {TOKEN_NOT,   unaryNotOpTypeEvaluator}
 };
 
 #endif

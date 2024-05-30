@@ -443,7 +443,7 @@ void ILGenerator::visit(ASTContinue& continue_node, bool is_sub_expr)
     std::cout << "CONTINUE\n";
     
     if(CB_PARAMS_CHECK_CONDITION(continue_node.continue_params, IS_USING_SYMTBL))
-        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYM_TABLES, std::to_string(continue_node.scopes_to_destroy));
+        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES, std::to_string(continue_node.scopes_to_destroy));
 
     ILInstruction instruction = CB_PARAMS_CHECK_CONDITION(continue_node.continue_params, IS_FOR_LOOP) 
                                     ? ILInstruction::ITER_NEXT 
@@ -459,7 +459,7 @@ void ILGenerator::visit(ASTBreak& break_node, bool is_sub_expr)
     std::cout << "BREAK\n";
 
     if(CB_PARAMS_CHECK_CONDITION(break_node.break_params, IS_USING_SYMTBL))
-        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYM_TABLES, std::to_string(break_node.scopes_to_destroy));
+        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES, std::to_string(break_node.scopes_to_destroy));
     
     //Second is where we store all break checkpoints u could say, to be later updated by respective Loops
     cb_info.back().second.emplace_back(il_code.size());
