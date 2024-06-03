@@ -1,14 +1,22 @@
 #include <chrono>
 
 #include "interpreter.hpp"
+#include "../Common/common.hpp"
 
 int main(int argc, char** argv)
 {
+    const char* const EXT = ".cflx";
+
     std::ios::sync_with_stdio(false);
 
-    if(argc != 2)
-    {
-        std::cout << "[USAGE]: .\\FluxInt generated.flx\n";
+    if(argc != 2) {
+        std::cout << "[USAGE]: .\\FluxInt [filename].cflx\n";
+        std::exit(1);
+    }
+
+    const char* filename = argv[1];
+    if(!checkFileExt(EXT, filename)) {
+        std::cout << "[InterpreterError]: File must have a `" << EXT << "` extension: " << filename << '\n';
         std::exit(1);
     }
 

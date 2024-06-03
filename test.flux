@@ -1,13 +1,14 @@
-include CommonDefs.flux
+include Flux.MathDefs.flux
 
-Int age = 18;
-Int result = FALSE;
+Float radius = 5.0,
+      circumference = 0.0,
+      area = Cast<Float>(FALSE);
 
-If (age < 18) {
-    result = FALSE;
+If (radius <= 10) {
+    circumference = 2 * M_PI * radius;
 }
 Else {
-    result = TRUE;
+    area = M_PI * radius * radius;
 }
 
-result;
+circumference;

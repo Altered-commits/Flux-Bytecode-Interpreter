@@ -6,26 +6,37 @@
 #include "preprocessor.hpp"
 #include "parser.hpp"
 #include "ilgen.hpp"
+#include "error_printer.hpp"
+#include "../Common/common.hpp"
 
 #include "file.hpp"
 
 int main(int argc, char** argv)
 {
+    const char* const EXT = ".flux";
+    
     std::ios::sync_with_stdio(false);
+
     //Make sure there are exactly 2 cmd args
-    if(argc != 2)
-    {
-        std::cout << "[USAGE]: .\\FluxCompiler filename[.txt]\n";
+    if(argc != 2) {
+        std::cout << "[USAGE]: .\\FluxCompiler [filename].flux\n";
+        std::exit(1);
+    }
+
+    //Check if the file name ends with .flux extension
+    const char* filename = argv[1];
+    if (!checkFileExt(EXT, filename)) {
+        std::cout << "[CompilerError]: File must have a `" << EXT << "` extension: " << filename << '\n';
         std::exit(1);
     }
 
     //Read the source code from a file
-    std::ifstream in_file{argv[1]};
-    if(!in_file.is_open())
-    {
-        std::cout << "[CompilerError]: Failed to open file: " << argv[1] << '\n';
+    std::ifstream in_file{filename};
+    if(!in_file.is_open()) {
+        std::cout << "[CompilerError]: Failed to open file: " << filename << '\n';
         std::exit(1);
     }
+    
     std::stringstream sourceCode;
     sourceCode << in_file.rdbuf();
 

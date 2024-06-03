@@ -13,16 +13,32 @@ void Preprocessor::preprocessInternal(std::string&& sourceCode)
 
         if(line.compare(0, 7, "include") == 0)
         {
-            std::string fileName = line.substr(8);
+            std::string filePath = line.substr(8);
             
-            if(preprocessedFiles.find(fileName) != preprocessedFiles.end())
+            //Remove whitespace
+            filePath.erase(std::remove_if(filePath.begin(), filePath.end(), ::isspace), filePath.end());
+
+            if (filePath.size() < 5 || filePath.compare(filePath.size() - 5, 5, ".flux") != 0) {
+                std::cout << "PreprocessorError: Include file must have a '.flux' extension: " << filePath << '\n';
+                std::exit(1);
+            }
+
+            //Replace all '.' with '/' except for the last one
+            size_t lastDotPos = filePath.find_last_of('.');
+            for (size_t i = 0; i < lastDotPos; ++i) {
+                if (filePath[i] == '.') {
+                    filePath[i] = '/';
+                }
+            }
+
+            if(preprocessedFiles.find(filePath) != preprocessedFiles.end())
                 continue;
             
-            preprocessedFiles.insert(fileName);
+            preprocessedFiles.insert(filePath);
             //Open file and read its content to preprocess
-            std::ifstream file{fileName};
+            std::ifstream file{filePath};
             if(!file) {
-                std::cout << "PreprocessorError: " << "File not found for 'include' directive: " << fileName << '\n';
+                std::cout << "PreprocessorError: " << "File not found for 'include' directive: " << filePath << '\n';
                 std::exit(1);
             }
 

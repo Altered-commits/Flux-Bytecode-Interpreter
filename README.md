@@ -1,18 +1,22 @@
-### Flux
+# Flux
 
-**Description:** <br>
-Flux is a custom-built bytecode interpreter currently under development. I am creating it as a part of my own project.
+## Description
+Flux is a custom-built bytecode interpreter currently under development. This project is designed to deepen my understanding of interpreters and bytecode execution.
 
-**Usage:** <br>
-To compile, use the following command:<br>
-./FluxCompiler [filename].txt<br>
-->This command generates a `generated.flx` file.<br>
+## Usage
+To compile `.flux` file, use the following command:<br>
+```sh
+./FluxCompiler [filename].flux<br>
+```
+This command generates a `Gen.cflx` file.<br>
 
 To interpret, use the following command:<br>
-./FluxInt generated.flx<br>
+```sh
+./FluxInt Gen.cflx
+```
 
-**Future plans:** <br>
--Loops, Conditions, Functions, maybe even structs.<br>
--Optimizing Compiler and Interpreter.<br>
+## Future plans:
+1. Functions, maybe even structs.<br>
+2. Optimizing Compiler and Interpreter.<br>
 
 **---See the grammar.txt file to get an idea of syntax---**

@@ -3,6 +3,7 @@
 #define UNNAMED_INST_SET
 
 #include <cstdint>
+#include <cstring>
 
 //----------------------EVALUATED TYPES----------------------
 //A tag telling what the expression is going to evaluate to, either an Integer or Float etc
@@ -84,4 +85,16 @@ enum ILInstruction : std::uint8_t
     //EOF
     END_OF_FILE
 };
+
+//File extension checker
+static bool checkFileExt(const char* const EXT, const char* filename)
+{
+    size_t len    = strlen(filename);
+    size_t extLen = strlen(EXT);
+    if (len < extLen || strcmp(filename + len - extLen, EXT) != 0)
+        return false;
+    
+    return true;
+}
+
 #endif
