@@ -30,22 +30,15 @@ enum ILInstruction : std::uint8_t
 {
     PUSH_INT,
     PUSH_FLOAT,
-    //Integer instructions
+    //Arithmetic instructions
     ADD,
     SUB,
     MUL,
     DIV,
     MOD,
-    //Floating point version of normal integer instruction
-    FADD,
-    FSUB,
-    FMUL,
-    FDIV,
-    FMOD,
+    POW,
     //Unary instructions (NEGATION, etc)
     NEG,
-    //Power instruction
-    POW,
     //Variable instructions
     ASSIGN_VAR,
     ASSIGN_VAR_NO_POP,

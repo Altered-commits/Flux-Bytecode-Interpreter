@@ -18,99 +18,49 @@ std::vector<IterPtr> globalIteratorStack;
 //Think of this as program counter
 std::size_t globalInstructionIndex = 0;
 
-void ByteCodeInterpreter::handleIntegerArithmetic(ILInstruction inst)
+void ByteCodeInterpreter::handleArithmeticOperators(ILInstruction inst)
 {
-    auto& elem1 = std::get<int>(globalStack.back());
-    auto& elem2 = std::get<int>(STACK_REVERSE_ACCESS_ELEM(2));
-
-    int out = 0;
-
-    switch (inst)
-    {
-        case ILInstruction::ADD:
-            out = elem2 + elem1; break;
-        case ILInstruction::SUB:
-            out = elem2 - elem1; break;
-        case ILInstruction::MUL:
-            out = elem2 * elem1; break;
-        case ILInstruction::MOD:
-        {
-            if(elem1 == 0)
-            {
-                std::cout << "[RuntimeError]: Modulus By 0"; std::exit(1);
-            }
-            out = elem2 % elem1;
-        }
-        break;    
-        case ILInstruction::DIV:
-        {
-            if(elem1 == 0)
-            {
-                std::cout << "[RuntimeError]: Division By 0"; std::exit(1);
-            }
-            out = elem2 / elem1;
-        }
-        break;
-    }
-    
-    // Update the top element in place
-    STACK_REVERSE_ACCESS_ELEM(2) = out;
-    // Remove the top element
+    auto elem1 = globalStack.back();
     globalStack.pop_back();
+    auto& elem2 = globalStack.back();
+
+    std::visit([&](auto&& arg1, auto&& arg2) {
+        using Elem1Type = std::decay_t<decltype(arg1)>;
+        using Elem2Type = std::decay_t<decltype(arg2)>;
+
+        switch (inst)
+        {
+            case ILInstruction::ADD:
+                elem2 = arg2 + arg1; break;
+            case ILInstruction::SUB:
+                elem2 = arg2 - arg1; break;
+            case ILInstruction::MUL:
+                elem2 = arg2 * arg1; break;
+            case ILInstruction::POW:
+                elem2 = std::pow(arg2, arg1); break;
+            case ILInstruction::MOD:
+            {
+                if(arg1 == 0) {
+                    std::cout << "[RuntimeError]: Modulus By 0"; std::exit(1);
+                }
+                if constexpr(std::is_same_v<Elem1Type, int> && std::is_same_v<Elem2Type, int>)
+                    elem2 = arg2 % arg1;
+                else
+                    elem2 = std::fmod(arg2, arg1);
+            }
+            break;
+            case ILInstruction::DIV:
+            {
+                if(arg1 == 0) {
+                    std::cout << "[RuntimeError]: Division By 0"; std::exit(1);
+                }
+                elem2 = arg2 / arg1;
+            }
+        }
+    }, elem1, elem2);
 }
 
-void ByteCodeInterpreter::handleFloatingArithmetic(ILInstruction inst)
-{
-    auto elem1 = 0.0f, elem2 = 0.0f;
-
-    //Doesnt matter if its int or float, we casting it to float always
-    //First element to pop
-    std::visit([&elem1](auto&& arg){
-        elem1 = static_cast<float>(arg);
-    }, globalStack.back());
-
-    //Second element to pop
-    std::visit([&elem2](auto&& arg){
-        elem2 = static_cast<float>(arg);
-    }, STACK_REVERSE_ACCESS_ELEM(2));
-
-    float out;
-
-    switch (inst)
-    {
-        case ILInstruction::FADD:
-            out = elem2 + elem1; break;
-        case ILInstruction::FSUB:
-            out = elem2 - elem1; break;
-        case ILInstruction::FMUL:
-            out = elem2 * elem1; break;
-        case ILInstruction::FMOD:
-        {
-            if(elem1 == 0.0f)
-            {
-                std::cout << "[RuntimeError]: Modulus By 0"; std::exit(1);
-            }
-            out = std::fmod(elem2, elem1);
-        }
-        break;
-        case ILInstruction::FDIV:
-        {
-            if(elem1 == 0.0f)
-            {
-                std::cout << "[RuntimeError]: Division By 0"; std::exit(1);
-            }
-            out = elem2 / elem1;
-        }
-        break;
-        case ILInstruction::POW:
-            out = std::pow(elem2, elem1); break;
-    }
-    
-    STACK_REVERSE_ACCESS_ELEM(2) = out;
-    globalStack.pop_back();
-}
-
-void ByteCodeInterpreter::handleUnaryArithmetic()
+void ByteCodeInterpreter::handleUnaryOperators()
 {
     //Unary not handled in 'handleComparisionAndLogical'
     std::visit([](auto&& arg) {
@@ -125,11 +75,11 @@ void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst, const std
     const bool shouldPop = inst != ASSIGN_VAR_NO_POP && inst != REASSIGN_VAR_NO_POP;
     const bool shouldReassign = inst == REASSIGN_VAR || inst == REASSIGN_VAR_NO_POP;
 
-    // Pop the stack to get the evaluated expression if necessary
+    //Pop the stack to get the evaluated expression if necessary
     if (shouldPop)
         globalStack.pop_back();
     
-    // Determine whether to reassign the variable or not
+    //Determine whether to reassign the variable or not
     shouldReassign ? setValueToNthFrame(identifier, std::move(elem), scopeIndex)
                    : setValueToTopFrame(identifier, std::move(elem));
 }
@@ -336,7 +286,7 @@ void ByteCodeInterpreter::interpretInstructions()
             
             //Unary Operations, '+' as unary -> useless ahh
             case ILInstruction::NEG:
-                handleUnaryArithmetic();
+                handleUnaryOperators();
                 break;
             
             //Integer Operations, idk if this is even the right way
@@ -345,7 +295,8 @@ void ByteCodeInterpreter::interpretInstructions()
             case ILInstruction::MUL:
             case ILInstruction::DIV:
             case ILInstruction::MOD:
-                handleIntegerArithmetic(i.inst);
+            case ILInstruction::POW:
+                handleArithmeticOperators(i.inst);
                 break;
             
             //Casting stuff
@@ -354,16 +305,6 @@ void ByteCodeInterpreter::interpretInstructions()
                 handleCasting(i.inst);
                 break;
             
-            //Floating Operations and Power arithmetic, as it also requires both to be floating point
-            case ILInstruction::FADD:
-            case ILInstruction::FSUB:
-            case ILInstruction::FMUL:
-            case ILInstruction::FDIV:
-            case ILInstruction::FMOD:
-            case ILInstruction::POW:
-                handleFloatingArithmetic(i.inst);
-                break;
-
             //Comparision Operations
             case ILInstruction::CMP_EQ:
             case ILInstruction::CMP_NEQ:
@@ -480,7 +421,7 @@ IterPtr ByteCodeInterpreter::getIterator(const std::string& id, IteratorType ite
         case RANGE_ITERATOR:
         {
             //Pop three values from stack (step, stop, start)
-            auto vstep  = STACK_REVERSE_ACCESS_ELEM(1);
+            auto vstep  = globalStack.back();
             auto vstop  = STACK_REVERSE_ACCESS_ELEM(2);
             auto vstart = STACK_REVERSE_ACCESS_ELEM(3);
             

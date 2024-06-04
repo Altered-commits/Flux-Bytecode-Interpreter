@@ -59,34 +59,28 @@ void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool)
     binary_op_node.left->accept(*this, true);
     binary_op_node.right->accept(*this, true);
 
-    // Determine if the operation involves floating-point arithmetic
-    // If either side is a float type, or if the expression contains power operator, we use float operations
-    bool isFloatOperation = (binary_op_node.left->isFloat() || binary_op_node.right->isFloat())
-                            ||
-                            (binary_op_node.left->isPowerOp() || binary_op_node.right->isPowerOp());
-
     ILInstruction instruction;
 
     switch (binary_op_node.op_type) {
         case TOKEN_PLUS:
-            std::cout << (isFloatOperation ? "FADD\n" : "ADD\n");
-            instruction = isFloatOperation ? ILInstruction::FADD : ILInstruction::ADD;
+            std::cout << "ADD\n";
+            instruction = ILInstruction::ADD;
             break;
         case TOKEN_MINUS:
-            std::cout << (isFloatOperation ? "FSUB\n" : "SUB\n");
-            instruction = isFloatOperation ? ILInstruction::FSUB : ILInstruction::SUB;
+            std::cout << "SUB\n";
+            instruction = ILInstruction::SUB;
             break;
         case TOKEN_MULT:
-            std::cout << (isFloatOperation ? "FMUL\n" : "MUL\n");
-            instruction = isFloatOperation ? ILInstruction::FMUL : ILInstruction::MUL;
+            std::cout << "MUL\n";
+            instruction = ILInstruction::MUL;
             break;
         case TOKEN_DIV:
-            std::cout << (isFloatOperation ? "FDIV\n" : "DIV\n");
-            instruction = isFloatOperation ? ILInstruction::FDIV : ILInstruction::DIV;
+            std::cout << "DIV\n";
+            instruction = ILInstruction::DIV;
             break;
         case TOKEN_MODULO:
-            std::cout << (isFloatOperation ? "FMOD\n" : "MOD\n");
-            instruction = isFloatOperation ? ILInstruction::FMOD : ILInstruction::MOD;
+            std::cout << "MOD\n";
+            instruction = ILInstruction::MOD;
             break;
         case TOKEN_POW:
             std::cout << "POW\n";

@@ -14,8 +14,8 @@
 
 #include "..\Common\common.hpp"
 
-using Byte = char;
-using Object = std::variant<int, float>; //Had no other name
+using Byte             = char;
+using Object           = std::variant<int, float, double>; //Had no other name
 using InstructionValue = std::variant<int, float, std::uint16_t, std::size_t, std::string>;
 
 #include "iterators.hpp"
@@ -58,9 +58,8 @@ class ByteCodeInterpreter {
         void interpretInstructions();
     
     private:
-        void handleUnaryArithmetic();
-        void handleIntegerArithmetic(ILInstruction);
-        void handleFloatingArithmetic(ILInstruction);
+        void handleUnaryOperators();
+        void handleArithmeticOperators(ILInstruction);
         void handleVariableAssignment(ILInstruction, const std::string&, const std::uint8_t);
         void handleVariableAccess(const std::string&, const std::uint8_t);
         void handleCasting(ILInstruction);
