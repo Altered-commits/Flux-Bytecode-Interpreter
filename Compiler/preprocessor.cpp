@@ -9,7 +9,10 @@ void Preprocessor::preprocessInternal(std::string&& sourceCode)
     while (std::getline(source, line))
     {
         if(line.empty())
+        {
+            output << '\n';
             continue;
+        }
 
         if(line.compare(0, 7, "include") == 0)
         {
@@ -99,4 +102,5 @@ void Preprocessor::processLine(std::string& line)
             ++i;
         }
     }
+    output << '\n';
 }

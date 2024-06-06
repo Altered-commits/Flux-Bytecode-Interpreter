@@ -1,3 +1,8 @@
+
+/*
+ WELCOME TO THE SLOWEST LEXER WHICH I EVER BUILT, THIS IS SO BAD I WANNA DIE,
+ WILL OPTIMIZE LATER CUZ THIS GIVES ME CANCER.
+*/
 #include <iostream>
 #include "lexer.hpp"
 
@@ -290,7 +295,7 @@ Token Lexer::peek_next_token()
 void Lexer::set_token(const std::string& token_text, TokenType token_type)
 {
     token.token_type  = token_type;
-    token.token_value = token_text;
+    token.token_value = std::move(token_text);
 }
 
 std::pair<std::size_t, std::size_t> Lexer::getLineColCount()

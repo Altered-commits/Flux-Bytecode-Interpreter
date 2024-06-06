@@ -28,6 +28,7 @@ int main(int argc, char** argv)
     //End of Compilation
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << "Time to interpret: " <<
-        (std::chrono::duration_cast<std::chrono::microseconds>(end - start)).count() << "ms" << '\n';
+        (std::chrono::duration_cast<std::chrono::microseconds>(end - start)).count() << " microsec" << '\n';
+
     return 0;
 }

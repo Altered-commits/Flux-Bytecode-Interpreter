@@ -19,7 +19,7 @@ class Lexer
 {
     public:
         Lexer(const std::string& text)
-            : text(text), text_length(text.length())
+            : text(std::move(text)), text_length(text.length())
         {
             cur_pos = 0;
             cur_chr = text[cur_pos];

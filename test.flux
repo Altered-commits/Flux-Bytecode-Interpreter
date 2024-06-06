@@ -1,9 +1,19 @@
-include Flux.MathDefs.flux
+include Flux.CommonDefs.flux
 
-Int j = 0;
+Int num = 4;
+Int isPrime = TRUE;
 
-For i in 0..M_PI..0.001 {
-    j = j + 1;
+If (num <= 1) {
+    isPrime = FALSE;
+} Elif (num == 2) {
+    isPrime = TRUE;
+} Else {
+    For i in 2..(num / 2)+1 {
+        If (num % i == 0) {
+            isPrime = FALSE;
+            Break;
+        }
+    }
 }
 
-j;
+isPrime;

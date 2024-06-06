@@ -109,7 +109,7 @@ struct ASTValue : public ASTNode
     std::string value;
 
     ASTValue(EvalType type, const std::string& value)
-        : type(type), value(value)
+        : type(type), value(std::move(value))
     {}
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
@@ -216,7 +216,7 @@ struct ASTVariableAssign : public ASTNode
     std::uint16_t scope_index;
 
     ASTVariableAssign(const std::string& identifier, EvalType type, ASTPtr&& expr, bool is_reassignment, std::uint16_t scope_index)
-        : identifier(identifier), var_type(type), expr(std::move(expr)), is_reassignment(is_reassignment), scope_index(scope_index)
+        : identifier(std::move(identifier)), var_type(type), expr(std::move(expr)), is_reassignment(is_reassignment), scope_index(scope_index)
     {}
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
@@ -243,7 +243,7 @@ struct ASTVariableAccess : public ASTNode
     std::uint16_t scope_index;
 
     ASTVariableAccess(const std::string& identifier, EvalType type, std::uint16_t scope_index)
-        : identifier(identifier), var_type(type), scope_index(scope_index)
+        : identifier(std::move(identifier)), var_type(type), scope_index(scope_index)
     {}
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
@@ -379,7 +379,7 @@ struct ASTRangeIterator : public ASTBaseIterator
     ASTRangeIterator(ASTPtr&& start, ASTPtr&& stop, ASTPtr&& step, const std::string& iter_id, bool coc) //coc lmfao
         : start(std::move(start)), stop(std::move(stop)), step(std::move(step)), condition_or_construction(coc)
     {
-        iter_identifier = iter_id;
+        iter_identifier = std::move(iter_id);
     }
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
@@ -439,7 +439,7 @@ struct ASTForNode : public ASTNode
     ASTPtr      for_body;
 
     ASTForNode(const std::string& id, ASTPtr&& range, ASTPtr&& for_body)
-        : id(id), range(std::move(range)), for_body(std::move(for_body))
+        : id(std::move(id)), range(std::move(range)), for_body(std::move(for_body))
     {}
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {

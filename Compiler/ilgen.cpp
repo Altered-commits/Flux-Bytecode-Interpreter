@@ -7,50 +7,44 @@ void ILGenerator::handleBreakIfExists(std::size_t jumpOffset)
     if(!cb_info.back().second.empty())
         //Update operands for Break instruction
         for (auto &&i : cb_info.back().second)
-            il_code[i].operand = std::to_string(jumpOffset);
+            il_code[i].value = jumpOffset;
     //Empty = no break exists, dont do anything
 }
 
 //---------------INTERMEDIATE LANGUAGE -> BYTECODE GENERATOR---------------
-std::vector<ILCommand>& ILGenerator::generateIL()
+std::vector<Instruction>& ILGenerator::generateIL()
 {
     if(!ast_statements.empty())
     {
         for (auto &&ast : ast_statements)
-        {
-            //Initially, subexpression will be false
             ast->accept(*this, false);
-        }
 
-        //Manually add END_OF_FILE
+        //Manually add END_OF_FILE, cuz the code wont do it by itself
         il_code.emplace_back(ILInstruction::END_OF_FILE);
 
         return il_code;
     }
-    std::cerr << "[ILError]: Failed to generate IL, AST is empty!\n";
-    std::exit(1);
+    printError("ILGenerator", "Failed to generate bytecode, no code provided.");
 }
 
 void ILGenerator::visit(ASTValue& value_node, bool)
 {
-    ILInstruction inst_type;
-        // For constant values, push them onto the stack
-        switch (value_node.type)
-        {
-            case EVAL_INT:
-                inst_type = ILInstruction::PUSH_INT;
-                std::cout << "PUSH_INT ";
-                break;
-            case EVAL_FLOAT:
-                inst_type = ILInstruction::PUSH_FLOAT;
-                std::cout << "PUSH_FLOAT ";
-                break;
-            default:
-                printError("ASTValue type not supported", value_node.type);
-                break;
-        }
-        std::cout << value_node.value << '\n';
-        il_code.emplace_back(inst_type, value_node.value);
+    // For constant values, push them onto the stack
+    switch (value_node.type)
+    {
+        case EVAL_INT:
+            std::cout << "PUSH_INT ";
+            il_code.emplace_back(ILInstruction::PUSH_INT, std::stoi(value_node.value));
+            break;
+        case EVAL_FLOAT:
+            std::cout << "PUSH_FLOAT ";
+            il_code.emplace_back(ILInstruction::PUSH_FLOAT, std::stof(value_node.value));
+            break;
+        default:
+            printError("ASTValue type not supported", value_node.type);
+            break;
+    }
+    std::cout << value_node.value << '\n';
 }
 
 void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool)
@@ -172,10 +166,10 @@ void ILGenerator::visit(ASTVariableAssign& var_assign_node, bool is_sub_expr)
     if(var_assign_node.is_reassignment)
     {
         std::cout << "SCOPE_INDEX: " << (int)var_assign_node.scope_index << '\n';
-        il_code.emplace_back(ILInstruction::DATAINST_VAR_SCOPE_IDX, std::to_string(var_assign_node.scope_index));
+        il_code.emplace_back(ILInstruction::DATAINST_VAR_SCOPE_IDX, 0, var_assign_node.scope_index);
     }
 
-    il_code.emplace_back(inst, var_assign_node.identifier);
+    il_code.emplace_back(inst, std::move(var_assign_node.identifier));
 }
 
 void ILGenerator::visit(ASTVariableAccess& var_access_node, bool)
@@ -184,8 +178,8 @@ void ILGenerator::visit(ASTVariableAccess& var_access_node, bool)
               << "SCOPE_INDEX: " << (int)var_access_node.scope_index << '\n';
     
     //Pass the scope index as well with special DATAINST instructions
-    il_code.emplace_back(ILInstruction::DATAINST_VAR_SCOPE_IDX, std::to_string(var_access_node.scope_index));
-    il_code.emplace_back(ILInstruction::ACCESS_VAR, var_access_node.identifier);
+    il_code.emplace_back(ILInstruction::DATAINST_VAR_SCOPE_IDX, 0, var_access_node.scope_index);
+    il_code.emplace_back(ILInstruction::ACCESS_VAR, std::move(var_access_node.identifier));
 }
 
 void ILGenerator::visit(ASTCastNode& expr, bool)
@@ -200,7 +194,7 @@ void ILGenerator::visit(ASTCastNode& expr, bool)
             break;
         case EVAL_FLOAT:
             std::cout << "CAST_FLOAT\n";
-            il_code.emplace_back(ILInstruction::CAST_INT);
+            il_code.emplace_back(ILInstruction::CAST_FLOAT);
             break;
         default:
             printError("Unsupported Cast<>() Type: ", expr.eval_type);
@@ -239,10 +233,10 @@ void ILGenerator::visit(ASTTernaryOp& ternary_node, bool is_sub_expr)
 
     //now that everything is generated, we are going to be updating jump locations
     //First: Jump to False Expression
-    il_code[false_expr_jump_location].operand = std::to_string(expr_jump_location + 1);
+    il_code[false_expr_jump_location].value = expr_jump_location + 1;
     
     //Second: Jump entire expression
-    il_code[expr_jump_location].operand = std::to_string(il_code.size());
+    il_code[expr_jump_location].value = il_code.size();
 
     std::cout << "FLOC: " << expr_jump_location + 1 << " ELOC: " << il_code.size() << '\n';
 }
@@ -276,7 +270,7 @@ void ILGenerator::visit(ASTIfNode& if_node, bool is_sub_expr)
     std::cout << "JUMP (If)\n";
 
     //False condition jump
-    il_code[jump_if_condition].operand = std::to_string(il_code.size());
+    il_code[jump_if_condition].value = il_code.size();
 
     //Look for all Elif conditions
     for (auto &&[elif_condition, elif_body] : if_node.elif_clauses)
@@ -301,7 +295,7 @@ void ILGenerator::visit(ASTIfNode& if_node, bool is_sub_expr)
         std::cout << "JUMP (Elif)\n";
 
         //Update the false condition jump to next Elif / Else
-        il_code[jump_elif_condition].operand = std::to_string(il_code.size());
+        il_code[jump_elif_condition].value = il_code.size();
     }
     
     //If 'Else' exists, generate its body
@@ -309,11 +303,11 @@ void ILGenerator::visit(ASTIfNode& if_node, bool is_sub_expr)
         if_node.else_body->accept(*this, is_sub_expr);
     
     //Whatever is at end is well the final location of end of "if condition"
-    il_code[jump_to_end_of_expr].operand = std::to_string(il_code.size());
+    il_code[jump_to_end_of_expr].value = il_code.size();
 
     //Also update all the Elifs final location like If
     for (auto &&idx : elif_jump_locations)
-        il_code[idx].operand = std::to_string(il_code.size());
+        il_code[idx].value = il_code.size();
     
     SCOPE_END
 }
@@ -344,10 +338,10 @@ void ILGenerator::visit(ASTForNode& for_node, bool is_sub_expr)
     
     //Go past the current value and loop again
     std::cout << "ITER_NEXT " << iter_has_next_location << '\n';
-    il_code.emplace_back(ILInstruction::ITER_NEXT, std::to_string(iter_has_next_location));
+    il_code.emplace_back(ILInstruction::ITER_NEXT, iter_has_next_location);
 
     //After this location is where its going to jump if condition is false
-    il_code[iter_has_next_location].operand = std::to_string(il_code.size());
+    il_code[iter_has_next_location].value = il_code.size();
     std::cout << "IHN LOC: " << il_code.size() << '\n';
 
     //Check if break exists in our code and handle it accordingly
@@ -377,11 +371,11 @@ void ILGenerator::visit(ASTWhileNode& while_node, bool is_sub_expr)
 
     //End of expression, unconditional jump back to evaluating condition
     std::cout << "JUMP " << while_condition_location << '\n';
-    il_code.emplace_back(ILInstruction::JUMP, std::to_string(while_condition_location));
+    il_code.emplace_back(ILInstruction::JUMP, while_condition_location);
 
     //End of loop, update JUMP_IF_FALSE location
     std::cout << "LOC: " << il_code.size() << '\n';
-    il_code[jump_if_false_location].operand = std::to_string(il_code.size());
+    il_code[jump_if_false_location].value = il_code.size();
 
     //Same here
     handleBreakIfExists(il_code.size());
@@ -406,12 +400,12 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
     //After initializing Iterator, emplace the ITER_RECALC_STEP instruction
     else {
         std::cout << "PUSH_INT 0\n";
-        il_code.emplace_back(ILInstruction::PUSH_INT, "0");
+        il_code.emplace_back(ILInstruction::PUSH_INT, 0);
     }
 
     //Pre init aka set up identifier
     std::cout << "DATAINST_ITER_ID " << range_iter_node.iter_identifier << '\n';
-    il_code.emplace_back(ILInstruction::DATAINST_ITER_ID, range_iter_node.iter_identifier);
+    il_code.emplace_back(ILInstruction::DATAINST_ITER_ID, std::move(range_iter_node.iter_identifier));
 
     //Generate an ITER_INIT instruction passing in the type of iterator and iter data type
     //'Or' them together, then we cast it to integer
@@ -419,7 +413,7 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
                        | ((std::uint8_t)range_iter_node.evaluateIterType());
 
     std::cout << "ITER_INIT " << data << '\n';
-    il_code.emplace_back(ILInstruction::ITER_INIT, std::to_string(data));
+    il_code.emplace_back(ILInstruction::ITER_INIT, std::move(data));
     
     //Iterator is now initialized, recalculate step size if step is null
     if(range_iter_node.step == nullptr) {
@@ -437,13 +431,13 @@ void ILGenerator::visit(ASTContinue& continue_node, bool is_sub_expr)
     std::cout << "CONTINUE\n";
     
     if(CB_PARAMS_CHECK_CONDITION(continue_node.continue_params, IS_USING_SYMTBL))
-        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES, std::to_string(continue_node.scopes_to_destroy));
+        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES, 0, std::move(continue_node.scopes_to_destroy));
 
     ILInstruction instruction = CB_PARAMS_CHECK_CONDITION(continue_node.continue_params, IS_FOR_LOOP) 
                                     ? ILInstruction::ITER_NEXT 
                                     : ILInstruction::JUMP;
-    il_code.emplace_back(instruction, std::to_string(cb_info.back().first));
 
+    il_code.emplace_back(instruction, std::move(cb_info.back().first));
 }
 
 void ILGenerator::visit(ASTBreak& break_node, bool is_sub_expr)
@@ -453,9 +447,9 @@ void ILGenerator::visit(ASTBreak& break_node, bool is_sub_expr)
     std::cout << "BREAK\n";
 
     if(CB_PARAMS_CHECK_CONDITION(break_node.break_params, IS_USING_SYMTBL))
-        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES, std::to_string(break_node.scopes_to_destroy));
+        il_code.emplace_back(ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES, 0, std::move(break_node.scopes_to_destroy));
     
-    //Second is where we store all break checkpoints u could say, to be later updated by respective Loops
+    //Second is where we store all break checkpoints u could say.
     cb_info.back().second.emplace_back(il_code.size());
     il_code.emplace_back(ILInstruction::JUMP);
 }

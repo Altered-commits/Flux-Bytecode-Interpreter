@@ -7,6 +7,7 @@
 #include <variant>
 #include <cmath>
 
+#include "file.hpp"
 #include "ast.hpp"
 #include "error_printer.hpp"
 #include "..\Common\common.hpp" //Common between Interpreter and Compiler
@@ -21,23 +22,13 @@
 #define IL_LOOP_START cb_info.emplace_back(il_code.size(), std::vector<size_t>{});
 #define IL_LOOP_END   cb_info.pop_back();
 
-struct ILCommand
-{
-    ILInstruction instruction;
-    std::string   operand;
-    
-    ILCommand(ILInstruction instr, const std::string& op= "")
-        : instruction(instr), operand(op)
-    {}
-};
-
 class ILGenerator : public ASTVisitorInterface {
     public:
         ILGenerator(std::vector<ASTPtr>&& ast)
             : ast_statements(std::move(ast))
         {}
 
-        std::vector<ILCommand>& generateIL();
+        std::vector<Instruction>& generateIL();
 
     private:
         void visit(ASTValue&, bool);
@@ -65,7 +56,10 @@ class ILGenerator : public ASTVisitorInterface {
         std::vector<std::pair<std::size_t, std::vector<std::size_t>>> cb_info;
 
         std::vector<ASTPtr>    ast_statements;
-        std::vector<ILCommand> il_code;
+        std::vector<Instruction> il_code;
+    
+    private: //FileWriter
+
 };
 
 #endif

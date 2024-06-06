@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include "ilgen.hpp"
+#include "../Common/common.hpp"
 
 using Byte = char;
 
@@ -18,7 +19,7 @@ class FileWriter {
             }
         }
 
-        void writeToFile(const std::vector<ILCommand>& commands);
+        void writeToFile(const std::vector<Instruction>& commands);
     
     private:
         void writeStringToFile(const std::string& str);

@@ -20,9 +20,9 @@ using ParseFuncPtr = std::function<ASTPtr(void)>;
 #define CB_PARAMS_END cb_params = prev_params;
 
 //I could have put this code in create and destroy scope function but that would inc/dec this value for loops as well
-//Which i dont want
-#define SCOPE_DEPTH_INC ++non_loops_scope_depth;
-#define SCOPE_DEPTH_DEC --non_loops_scope_depth;
+//Which i dont want. Also we only increment if the statement is in a loop, else we just dont;
+#define SCOPE_DEPTH_INC non_loops_scope_depth += CB_PARAMS_CHECK_CONDITION(cb_params, IS_LOOP);
+#define SCOPE_DEPTH_DEC non_loops_scope_depth -= CB_PARAMS_CHECK_CONDITION(cb_params, IS_LOOP);
 
 class Parser
 {

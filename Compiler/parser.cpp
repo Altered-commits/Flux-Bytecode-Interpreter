@@ -5,9 +5,7 @@ std::vector<ASTPtr>& Parser::parse()
 {
     while(lex.get_current_token().token_type != TOKEN_EOF)
     {
-        auto res = parse_statement();
-
-        statements.push_back(std::move(res));
+        statements.emplace_back(parse_statement());
     }
 
     return statements;
@@ -69,7 +67,7 @@ ASTPtr Parser::parse_if_condition()
 ASTPtr Parser::parse_for_loop()
 {
     //Look for an identifier
-    std::string id = current_token.token_value;
+    std::string id = std::move(current_token.token_value);
     if(!match_types(TOKEN_ID))
         printError("ParserError", "Expected identifier after 'For'");
     
@@ -155,8 +153,8 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
                 int eval_stop  = preEvaluateAST<int>(*stop);
 
                 //If we are evaluating, might as well use this value instead of whole ass tree
-                start = create_value_node(EVAL_INT, std::to_string(eval_start).c_str());
-                stop  = create_value_node(EVAL_INT, std::to_string(eval_stop).c_str());
+                start = create_value_node(EVAL_INT, std::to_string(eval_start));
+                stop  = create_value_node(EVAL_INT, std::to_string(eval_stop));
 
                 step = std::move(create_value_node(EVAL_INT, (eval_start < eval_stop ? "1" : "-1")));
             }
@@ -172,8 +170,8 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
                 float eval_stop  = preEvaluateAST<float>(*stop);
 
                 //Same here
-                start = create_value_node(EVAL_FLOAT, std::to_string(eval_start).c_str());
-                stop  = create_value_node(EVAL_FLOAT, std::to_string(eval_stop).c_str());
+                start = create_value_node(EVAL_FLOAT, std::to_string(eval_start));
+                stop  = create_value_node(EVAL_FLOAT, std::to_string(eval_stop));
 
                 //Calculate the distance between two values
                 float diff = std::abs(eval_stop - eval_start);
@@ -183,7 +181,7 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
 
                 float interval = 10.0f * std::pow(10, order-1);
 
-                step = std::move(create_value_node(EVAL_FLOAT, std::to_string(eval_start < eval_stop ? interval : -interval).c_str()));
+                step = std::move(create_value_node(EVAL_FLOAT, std::to_string(eval_start < eval_stop ? interval : -interval)));
             }
             catch(const std::runtime_error& e) {
                 printError("ParserError", "Failed to Pre-Evaluate step value for 'RangeIterator', please specify step value (start..stop..step)");
@@ -268,9 +266,9 @@ ASTPtr Parser::parse_reassignment(EvalType var_type, std::uint16_t scope_index)
         printError("ParserError", "Expected identifier after type");
 
     //Variable name should exist
-    std::string identifier = current_token.token_value;
+    std::string identifier = std::move(current_token.token_value);
     if(get_type_from_symbol_table(identifier).first == EVAL_UNKNOWN)
-        printError("ParserError", "Current variable: '", identifier, "' doesn't exist.");
+        printError("ParserError", "Trying to access variable: '", identifier, "' that doesn't exist.");
 
     advance();
 
@@ -306,9 +304,9 @@ ASTPtr Parser::parse_declaration(EvalType var_type, std::uint16_t scope_index)
             printError("ParserError", "Expected identifier after type");
 
         //Variable name should not clash with the existing names
-        std::string identifier = current_token.token_value;
+        std::string identifier = std::move(current_token.token_value);
         if(find_variable_from_current_scope(identifier))
-            printError("ParserError", "Current variable: ", identifier, " already exists, use another name");
+            printError("ParserError", "Current variable: '", identifier, "' already exists, use another name");
 
         advance();
 
@@ -340,7 +338,7 @@ ASTPtr Parser::parse_declaration(EvalType var_type, std::uint16_t scope_index)
             }
             else
                 //Oops, types dont match, errrorrrrr!
-                printError("ParserError", "Evaluated expression type doesn't match the type assigned to variable: ", identifier);
+                printError("ParserError", "Evaluated expression type doesn't match the type assigned to variable: '", identifier, '\'');
         }
         //Now we look for ',' if we dont find it, then we know that we reached the end of it;
         if(!match_types(TOKEN_COMMA))
@@ -628,7 +626,7 @@ ASTPtr Parser::parse_atom()
         case TOKEN_INT:
         case TOKEN_FLOAT:
         {
-            ASTPtr ret_value = create_value_node(token_to_eval_type.at(current_token.token_type), current_token.token_value);
+            ASTPtr ret_value = create_value_node(token_to_eval_type.at(current_token.token_type), std::move(current_token.token_value));
             advance();
             return std::move(ret_value);
         }
@@ -767,10 +765,10 @@ std::pair<EvalType, std::uint16_t> Parser::get_type_from_symbol_table(const std:
     for (auto it = temporary_symbol_table.rbegin(); it != temporary_symbol_table.rend(); ++it) {
         auto symbol = it->find(id);
         if (symbol != it->end()) {
-            return {symbol->second.second, std::distance(it, temporary_symbol_table.rend()) - 1};
+            return std::make_pair(symbol->second.second, std::distance(it, temporary_symbol_table.rend()) - 1);
         }
     }
-    return {EVAL_UNKNOWN, 0};
+    return std::make_pair(EVAL_UNKNOWN, 0);
 }
 
 //This variation is pretty much used for pre-evaluating expressions
@@ -788,7 +786,7 @@ ASTRawPtr Parser::get_expr_from_symbol_table(const std::string& id)
 bool Parser::find_variable_from_current_scope(const std::string& identifier)
 {
     auto symbol = temporary_symbol_table.back().find(identifier);
-    return symbol != temporary_symbol_table.back().end() ? true : false;    
+    return symbol != temporary_symbol_table.back().end();    
 }
 
 void Parser::create_scope()
@@ -845,6 +843,11 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
                         printError("ParserError -> CompileTimeEvaluationError", "Division by zero error while pre-evaluating Binary expression");
                     else
                         return left / right;
+                case TOKEN_MODULO:
+                    if constexpr(std::is_same_v<RV, int>)
+                        return left % right;
+                    else
+                        return std::fmod(left, right);
                 case TOKEN_POW:
                     return std::pow(left, right);
                 //Error

@@ -14,39 +14,18 @@
 
 #include "..\Common\common.hpp"
 
-using Byte             = char;
-using Object           = std::variant<int, float, double>; //Had no other name
-using InstructionValue = std::variant<int, float, std::uint16_t, std::size_t, std::string>;
+using Byte   = char;
+using Object = std::variant<int, float, double>; //Had no other name
 
 #include "iterators.hpp"
-
-//Storing commands from file
-struct Instruction
-{
-    InstructionValue value;
-    ILInstruction    inst;
-
-    //Additional data, for scope indexing (for instructions like ACCESS_VAR or ASSIGN_VAR)
-    //Idk why im having this as a literal 16bit value but ight
-    std::uint16_t scopeIndexIfNeeded;
-
-    Instruction(ILInstruction inst, InstructionValue&& value = 0, std::uint16_t scopeIndex = 0)
-        : inst(inst), value(std::move(value)), scopeIndexIfNeeded(scopeIndex)
-    {}
-};
 
 class ByteCodeInterpreter {
     public:
         ByteCodeInterpreter(const char* fileName) {
             inFile.open(fileName, std::ios_base::binary);
             
-            if (!inFile.is_open()) {
+            if (!inFile) {
                 std::cerr << "[FileReadingError]: Error opening file: " << fileName << '\n';
-                std::exit(1);
-            }
-
-            if (!inFile.good() || inFile.fail()) {
-                std::cerr << "[FileReadingError]: File not in good state: " << fileName << '\n';
                 std::exit(1);
             }
         }

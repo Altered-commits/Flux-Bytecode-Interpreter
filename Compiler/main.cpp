@@ -52,16 +52,17 @@ int main(int argc, char** argv)
 
     //Intermediate Language Stage
     ILGenerator ilgen{std::move(tree)};
-    auto& gen_code = ilgen.generateIL();
+    auto& generatedBytecode = ilgen.generateIL();
+
+    //----------------COMPILATION END----------------
+    auto end = std::chrono::high_resolution_clock::now();
 
     //Write to file
     FileWriter fw{"Gen.cflx"};
-    fw.writeToFile(gen_code);
-    
-    //----------------COMPILATION END----------------
-    auto end = std::chrono::high_resolution_clock::now();
+    fw.writeToFile(generatedBytecode);
+
     std::cout << "Compilation Successful. Time to compile: " <<
-        (std::chrono::duration_cast<std::chrono::microseconds>(end - start)).count() << "ms" << '\n';
+        (std::chrono::duration_cast<std::chrono::microseconds>(end - start)).count() << " microsec" << '\n';
 
     return 0;
 }

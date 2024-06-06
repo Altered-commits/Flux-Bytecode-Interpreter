@@ -4,9 +4,10 @@
 
 #include <cstdint>
 #include <cstring>
+#include <variant>
 
 //----------------------EVALUATED TYPES----------------------
-//A tag telling what the expression is going to evaluate to, either an Integer or Float etc
+//A tag telling what the expression is going to evaluate to, either an Integer, Float, etc
 enum EvalType : std::uint8_t
 {
     EVAL_INT,
@@ -79,7 +80,24 @@ enum ILInstruction : std::uint8_t
     END_OF_FILE
 };
 
-//File extension checker
+//----------------------INSTRUCTION----------------------
+using InstructionValue = std::variant<int, float, std::uint16_t, std::size_t, std::string>;
+struct Instruction
+{
+    InstructionValue value;
+    ILInstruction    inst;
+
+    //Additional data, for scope indexing (for instructions like ACCESS_VAR or ASSIGN_VAR)
+    //Idk why im having this as a literal 16bit value but ight
+    std::uint16_t scopeIndexIfNeeded;
+
+    Instruction(ILInstruction inst, InstructionValue&& value = {}, std::uint16_t scopeIndex = 0)
+        : inst(inst), value(std::move(value)), scopeIndexIfNeeded(scopeIndex)
+    {}
+};
+
+
+//----------------------File extension checker----------------------
 static bool checkFileExt(const char* const EXT, const char* filename)
 {
     size_t len    = strlen(filename);
