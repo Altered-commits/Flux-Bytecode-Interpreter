@@ -6,7 +6,7 @@
 #include "preprocessor.hpp"
 #include "parser.hpp"
 #include "ilgen.hpp"
-#include "error_printer.hpp"
+#include "..\Common\error_printer.hpp"
 #include "../Common/common.hpp"
 
 #include "file.hpp"
@@ -47,7 +47,7 @@ int main(int argc, char** argv)
     Preprocessor preprocess{std::move(sourceCode.str())};
 
     //Lexing and Parsing Stage
-    Parser parser{std::move(preprocess.preprocess())};
+    Parser parser{preprocess.preprocess()};
     auto& tree = parser.parse();
 
     //Intermediate Language Stage

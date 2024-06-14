@@ -60,6 +60,7 @@ class Lexer
     private:
         //For Differentiation of keyword and identifier
         const std::unordered_map<std::string, TokenType> identifier_map = {
+            {"Void", TOKEN_KEYWORD_VOID},
             {"Int", TOKEN_KEYWORD_INT},
             {"Float", TOKEN_KEYWORD_FLOAT},
             {"Cast", TOKEN_KEYWORD_CAST},
@@ -69,13 +70,15 @@ class Lexer
             {"For", TOKEN_KEYWORD_FOR},
             {"in", TOKEN_KEYWORD_IN},
             {"While", TOKEN_KEYWORD_WHILE},
+            {"Func", TOKEN_KEYWORD_FUNC},
             {"Continue", TOKEN_KEYWORD_CONTINUE},
-            {"Break", TOKEN_KEYWORD_BREAK}
+            {"Break", TOKEN_KEYWORD_BREAK},
+            {"Return", TOKEN_KEYWORD_RETURN},
         };
 
 };
 
 //SO THAT THIS DOESNT GIVE ERROR OF INCOMPLETE TYPE
-#include "error_printer.hpp"
+#include "..\Common\error_printer.hpp"
 
 #endif

@@ -1,6 +1,7 @@
 #ifndef UNNAMED_TOKEN_HPP
 #define UNNAMED_TOKEN_HPP
 
+#include <unordered_map>
 #include <string>
 
 enum TokenType : std::uint8_t {
@@ -37,6 +38,7 @@ enum TokenType : std::uint8_t {
     TOKEN_OR,
     //Keyword and Identifier Types
     TOKEN_ID,
+    TOKEN_KEYWORD_VOID,
     TOKEN_KEYWORD_INT,
     TOKEN_KEYWORD_FLOAT,
     TOKEN_KEYWORD_CAST,
@@ -46,8 +48,10 @@ enum TokenType : std::uint8_t {
     TOKEN_KEYWORD_FOR,
     TOKEN_KEYWORD_IN,
     TOKEN_KEYWORD_WHILE,
+    TOKEN_KEYWORD_FUNC,
     TOKEN_KEYWORD_CONTINUE,
     TOKEN_KEYWORD_BREAK,
+    TOKEN_KEYWORD_RETURN,
     //, Type
     TOKEN_COMMA,
     //Ternary(? :) Type,
@@ -59,6 +63,17 @@ enum TokenType : std::uint8_t {
     //.. and ... (Range and Ellipsis)
     TOKEN_RANGE,
     TOKEN_ELLIPSIS,
+};
+
+//Some useful string repr of token type
+//Mostly used in printing of error messages
+const std::unordered_map<TokenType, const char* const> token_type_to_string = {
+    { TOKEN_LPAREN, "(" },
+    { TOKEN_RPAREN, ")" },
+    { TOKEN_LBRACE, "{" },
+    { TOKEN_RBRACE, "}" },
+    { TOKEN_LT,     "<" },
+    { TOKEN_GT,     ">" }
 };
 
 struct Token

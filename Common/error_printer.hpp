@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <iostream>
 
-#include "lexer.hpp"
+#include "..\Compiler\lexer.hpp"
 #include "..\Common\common.hpp" //EvalType
 
 //Works if ur console supports it :pensive:
@@ -27,7 +27,10 @@ static void printError(const std::string& errorSection, const std::string& error
     auto [cur_line, cur_col] = Lexer::getLineColCount();
     std::cout << ConsoleTextColors::FAIL
                 << "[" << errorSection << "]: "
-                << errorMsg << '\n'
+                << errorMsg
+              << ConsoleTextColors::ENDC << '\n'
+              
+              << ConsoleTextColors::WARNING
                 << "[Error info]: Error came from -> Line: " << cur_line << ", Column: " << cur_col
               << ConsoleTextColors::ENDC << '\n';
     std::exit(1);
@@ -38,15 +41,16 @@ static void printError(const std::string& errorSection, const std::string& error
 {
     auto [cur_line, cur_col] = Lexer::getLineColCount();
     std::cout << ConsoleTextColors::FAIL
-              << "[" << errorSection << "]: "
+                << "[" << errorSection << "]: "
               << errorMsg;
     
     // Output additional arguments like std::cout
     ((std::cout << args), ...);
     
     std::cout << ConsoleTextColors::ENDC << '\n'
+
               << ConsoleTextColors::WARNING
-              << "[Error info]: Error came from -> Line: " << cur_line << ", Column: " << cur_col
+                << "[Error info]: Error came from -> Line: " << cur_line << ", Column: " << cur_col
               << ConsoleTextColors::ENDC << '\n';
     std::exit(1);
 }
@@ -73,4 +77,17 @@ static void printWarning(const std::string& warningSection, const std::string& w
                 << "\n[Warning Info]: " << "Line: " << cur_line << ", Column: " << cur_col
               << ConsoleTextColors::ENDC << '\n';
 }
+
+//RuntimeErrors
+static void printRuntimeError(const std::string& errorSection, const std::string& errorMsg)
+{
+    std::cout << ConsoleTextColors::FAIL
+                << "[" << errorSection << "]: "
+                << errorMsg
+              << ConsoleTextColors::ENDC << '\n';
+              
+    std::exit(1);
+}
+
+
 #endif

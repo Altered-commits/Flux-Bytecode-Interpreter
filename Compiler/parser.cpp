@@ -1,17 +1,158 @@
 #include <iostream>
 #include "parser.hpp"
 
-std::vector<ASTPtr>& Parser::parse()
+ListOfASTPtr& Parser::parse()
 {
     while(lex.get_current_token().token_type != TOKEN_EOF)
-    {
         statements.emplace_back(parse_statement());
-    }
 
     return statements;
 }
 
+//-----------------Helper Functions-----------------
+EvalType Parser::parse_type()
+{
+    //Look for a type 
+    switch (current_token.token_type)
+    {
+        //Perfect
+        case TOKEN_KEYWORD_VOID:
+        case TOKEN_KEYWORD_INT:
+        case TOKEN_KEYWORD_FLOAT:
+            break;
+   
+        default:
+            printError("ParserError", "Expected a type like Int, Float, Etc");
+    }
+    EvalType type = token_to_eval_type.at(current_token.token_type);
+    advance();
+
+    return type;
+}
+
+EvalType Parser::parse_type_as_param()
+{
+    if(!match_types(TOKEN_LT))
+        printError("ParserError", "Expected '<'");
+    advance();
+
+    EvalType type = parse_type();
+
+    if(!match_types(TOKEN_GT))
+        printError("ParserError", "Expected '>' after the type");
+    advance();
+
+    return type;
+}
+
+ListOfASTPtr Parser::parse_list(TokenType starting_token, TokenType ending_token)
+{
+    if(!match_types(starting_token))
+        printError("Expected starting token '", token_type_to_string.at(starting_token), '\'');
+    advance();
+
+    ListOfASTPtr expr_list;
+
+    while (!match_types(ending_token))
+    {
+        expr_list.emplace_back(parse_expr());
+
+        if(!match_types(TOKEN_COMMA))
+            break;
+        advance();
+    }
+    
+    if(!match_types(ending_token))
+        printError("Expected ending token '", token_type_to_string.at(ending_token), '\'');
+    advance();
+
+    //I trust compiler will RVO this, if not i cry
+    return expr_list;
+}
+
 //-----------------TECHNICALLY Helper Functions-----------------
+ASTPtr Parser::parse_function_decl()
+{
+    create_scope();
+    std::size_t current_scope = temporary_symbol_table.size();
+    EvalType    return_type   = parse_type_as_param();
+    
+    if(!match_types(TOKEN_ID))
+        printError("ParserError", "Expected identifier for function name");
+
+    std::string identifier = std::move(current_token.token_value);
+    advance();
+
+    if(!match_types(TOKEN_LPAREN))
+        printError("ParserError", "Expected '(' after identifier");
+    advance();
+    
+    FuncParams func_params;
+
+    while (true)
+    {
+        EvalType param_type = parse_type();
+
+        if(!match_types(TOKEN_ID))
+            printError("ParserError", "Expected identifier after type");
+
+        set_value_to_top_frame(current_token.token_value, std::make_unique<ASTDummyNode>(param_type), param_type);
+        func_params.emplace_back(param_type, std::move(current_token.token_value));
+        advance();
+
+        if(!match_types(TOKEN_COMMA))
+            break;
+        advance();
+    }
+
+    if(!match_types(TOKEN_RPAREN))
+        printError("ParserError", "Expected ')' for ending parameter list");
+    advance();
+
+    //Pre set it to symbol table once to allow recursive calls to be a thing
+    auto func_node = create_func_decl_node(current_scope, return_type, identifier, std::move(func_params), nullptr);
+    set_value_to_top_frame(identifier, func_node, EVAL_CALLABLE);
+    
+    SAVE_RETURN_TYPE(return_type)
+    ASTPtr func_body = parse_block();
+    RESTORE_RETURN_TYPE
+    
+    //Weird ahh syntax but this allows me to set its body manually
+    //I want to keep AST nodes as clean as possible without adding too many functions hence this syntax
+    static_cast<ASTFunctionDecl*>(func_node.get())->function_body = std::move(func_body);
+
+    destroy_scope();
+    //We destroy function scope but the scope behind the function scope is still present, that's where we push its value again
+    set_value_to_top_frame(identifier, func_node, EVAL_CALLABLE);
+    return func_node;
+}
+
+ASTPtr Parser::parse_function_call(const std::string& func_name)
+{
+    ASTFunctionDecl* inital_function = static_cast<ASTFunctionDecl*>(get_expr_from_symbol_table(func_name));
+    FuncArgs         func_args       = parse_list(TOKEN_LPAREN, TOKEN_RPAREN);
+    FuncParams&      func_params     = inital_function->function_params;
+
+    std::size_t args_len = func_args.size(), params_len = func_params.size();
+
+    //Check if len of function params matches len of func_args, if it doesn't, error
+    if(args_len != params_len)
+        printError("ParserError", "Function '", func_name, "' expected ", params_len, " arguments but got ", args_len);
+    
+    //Check datatype compatibility between args and params
+    for (std::size_t i = 0; i < args_len; ++i)
+    {
+        EvalType arg_type   = func_args[i]->evaluateExprType();
+        EvalType param_type = func_params[i].first;
+
+        if (arg_type != param_type)
+            printError("ParserError", "Parameter '", func_params[i].second, "' has incompatible type with the Argument passed to it");
+    }
+
+    //All set, create node and return
+    return create_func_call_node(std::move(func_args), inital_function);
+}
+
 ASTPtr Parser::parse_if_condition()
 {
     // Check '('
@@ -149,8 +290,8 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
         {
             //I will make ilgen send a special instruction to recalculate this
             try {
-                int eval_start = preEvaluateAST<int>(*start);
-                int eval_stop  = preEvaluateAST<int>(*stop);
+                int eval_start = pre_evaluate_tree<int>(*start);
+                int eval_stop  = pre_evaluate_tree<int>(*stop);
 
                 //If we are evaluating, might as well use this value instead of whole ass tree
                 start = create_value_node(EVAL_INT, std::to_string(eval_start));
@@ -166,8 +307,8 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
         else {
             //I dont want to do this entire thing during runtime, for integer variation its easy, this isn't
             try {
-                float eval_start = preEvaluateAST<float>(*start);
-                float eval_stop  = preEvaluateAST<float>(*stop);
+                float eval_start = pre_evaluate_tree<float>(*start);
+                float eval_stop  = pre_evaluate_tree<float>(*stop);
 
                 //Same here
                 start = create_value_node(EVAL_FLOAT, std::to_string(eval_start));
@@ -197,7 +338,7 @@ ASTPtr Parser::parse_block()
     if(!match_types(TOKEN_LBRACE)) printError("ParserError", "Expected '{' for statement");
     advance();
 
-    std::vector<ASTPtr> statements;
+    ListOfASTPtr statements;
     while(!match_types(TOKEN_RBRACE))
     {
         auto statement = parse_statement();
@@ -214,32 +355,7 @@ ASTPtr Parser::parse_block()
 ASTPtr Parser::parse_cast()
 {
     advance();
-    //Look for '<'
-    if(!match_types(TOKEN_LT))
-        printError("ParserError", "'Cast' Expected '<'");
-        
-    advance();
-    
-    //Look for a type 
-    switch (current_token.token_type)
-    {
-        //Perfect
-        case TOKEN_KEYWORD_INT:
-        case TOKEN_KEYWORD_FLOAT:
-            break;
-   
-        default:
-            printError("ParserError", "'Cast' Expected a type after '<', like Int, Float, Etc");
-    }
-    
-    EvalType eval_type = token_to_eval_type.at(current_token.token_type);
-    advance();
-
-    //Look for '>'
-    if(!match_types(TOKEN_GT))
-        printError("ParserError", "'Cast' Expected '>'");
-
-    advance();
+    EvalType eval_type = parse_type_as_param();
 
     //look for '(' before parsing expr
     if(!match_types(TOKEN_LPAREN))
@@ -294,7 +410,7 @@ ASTPtr Parser::parse_reassignment(EvalType var_type, std::uint16_t scope_index)
 
 ASTPtr Parser::parse_declaration(EvalType var_type, std::uint16_t scope_index)
 {
-    std::vector<ASTPtr> declarations;
+    ListOfASTPtr declarations;
     //We check for multiple variables to assign for
     //Type identifier, identifier = expr, identifier;
     while(true)
@@ -434,53 +550,89 @@ ASTPtr Parser::parse_statement()
         {
             advance();
 
-            CB_PARAMS_START(IS_USING_SYMTBL)
+            CBR_PARAMS_START(IS_USING_SYMTBL)
             SCOPE_DEPTH_INC
             create_scope();
             function_return_value = parse_if_condition();
             destroy_scope();
             SCOPE_DEPTH_DEC
-            CB_PARAMS_END
+            CBR_PARAMS_END
         }
         break;
         case TOKEN_KEYWORD_FOR:
         {
             advance();
 
-            CB_PARAMS_START(IS_LOOP | IS_FOR_LOOP)
+            CBR_PARAMS_START(IS_LOOP | IS_FOR_LOOP)
             create_scope();
             function_return_value = parse_for_loop();
             destroy_scope();
-            CB_PARAMS_END
+            CBR_PARAMS_END
         }
         break;
         case TOKEN_KEYWORD_WHILE:
         {
             advance();
 
-            CB_PARAMS_START(IS_LOOP)
+            CBR_PARAMS_START(IS_LOOP)
             create_scope();
             function_return_value = parse_while_loop();
             destroy_scope();
-            CB_PARAMS_END
+            CBR_PARAMS_END
+        }
+        break;
+        case TOKEN_KEYWORD_FUNC:
+        {
+            advance();
+            //Scope handling done in the function 'parse_function_decl' itself
+            CBR_PARAMS_START(IS_FUNCTION)
+            function_return_value = parse_function_decl();
+            CBR_PARAMS_END
         }
         break;
         case TOKEN_KEYWORD_CONTINUE:
         {
-            if(!CB_PARAMS_CHECK_CONDITION(cb_params, IS_LOOP))
+            if(!CBR_PARAMS_CHECK_CONDITION(cbr_params, IS_LOOP))
                 printError("ParserError", "'Continue' not allowed outside of a loop");
             
             advance();
-            function_return_value = create_continue_node(cb_params, non_loops_scope_depth);
+            function_return_value = create_continue_node(cbr_params, non_loops_scope_depth);
         }
         break;
         case TOKEN_KEYWORD_BREAK:
         {
-            if(!CB_PARAMS_CHECK_CONDITION(cb_params, IS_LOOP))
+            if(!CBR_PARAMS_CHECK_CONDITION(cbr_params, IS_LOOP))
                 printError("ParserError", "'Break' not allowed outside of a loop");
             
             advance();
-            function_return_value = create_break_node(cb_params, non_loops_scope_depth);
+            function_return_value = create_break_node(cbr_params, non_loops_scope_depth);
+        }
+        break;
+        case TOKEN_KEYWORD_RETURN:
+        {
+            if(!CBR_PARAMS_CHECK_CONDITION(cbr_params, IS_FUNCTION))
+                printError("ParserError", "'Return' not allowed outside of a function");
+            
+            advance();
+            
+            //In case of 'Return;' the return type is 'void'
+            if(match_types(TOKEN_SEMIC))
+            {
+                if(current_return_type != EVAL_VOID)
+                    printError("ParserError", "Function return type is not void, but 'Return;' found");
+                
+                function_return_value = create_return_node(nullptr);
+            }
+            else //Expression should exist after 'return' keyword
+            {
+                auto return_expr = parse_expr();
+
+                //See if this expression overall type is same as function return type
+                if(return_expr->evaluateExprType() != current_return_type)
+                    printError("ParserError", "Return type does not match the function's declared return type");
+
+                function_return_value = create_return_node(std::move(return_expr));
+            }
         }
         break;
         default:
@@ -491,7 +643,7 @@ ASTPtr Parser::parse_statement()
     //Semi colon only when some conditions aka ignore some keywords
     if(!(statement_type >= TOKEN_KEYWORD_IF
         && 
-        statement_type <= TOKEN_KEYWORD_WHILE))
+        statement_type <= TOKEN_KEYWORD_FUNC))
     {
         //If the expression makes sense, the user should also end it with a semicolon as well
         if(!match_types(TOKEN_SEMIC))
@@ -600,7 +752,25 @@ ASTPtr Parser::parse_unary()
 //For power operations, like 2 ^ 2 etc
 ASTPtr Parser::parse_power()
 {
-    return common_binary_op(std::bind(&parse_atom, this), TOKEN_POW, TOKEN_POW, std::bind(&parse_unary, this));
+    return common_binary_op(std::bind(&parse_call, this), TOKEN_POW, TOKEN_POW, std::bind(&parse_unary, this));
+}
+
+ASTPtr Parser::parse_call()
+{
+    auto atom = parse_atom();
+
+    //If it's '(' then the atom must be a callable object, otherwise we throw error
+    if(match_types(TOKEN_LPAREN))
+    {
+        if(!atom->isCallable())
+            printError("ParserError", "Type must be callable, current type doesn't support function call");
+        
+        //Valid function call
+        return parse_function_call(static_cast<const ASTVariableAccess&>(*atom).identifier);
+    }
+
+    //Else just return the atom
+    return atom;
 }
 
 //Primitive elements: INT, FLOAT, (), Cast<>() etc
@@ -608,27 +778,25 @@ ASTPtr Parser::parse_atom()
 {
     switch (current_token.token_type)
     {
-        //Variable getter
+        //Variable/Function getter
         case TOKEN_ID:
         {
             auto&&[type, scope_index] = get_type_from_symbol_table(current_token.token_value);
-            if(type != EVAL_UNKNOWN)
-            {
-                //We need the proper string value
-                auto expr = create_variable_access_node(type, current_token.token_value, scope_index);
-                advance();
-                return expr;
-            }
-            else
-                printError("ParserError", "Undefined variable: ", current_token.token_value);
+            if(type == EVAL_UNKNOWN)
+                printError("ParserError", "Invalid identifier '", current_token.token_value, '\'');
+            
+            //We need the proper string value
+            auto expr = create_variable_access_node(type, current_token.token_value, scope_index);
+            advance();
+            return expr;
         }
         //Values
         case TOKEN_INT:
         case TOKEN_FLOAT:
         {
-            ASTPtr ret_value = create_value_node(token_to_eval_type.at(current_token.token_type), std::move(current_token.token_value));
+            auto value = create_value_node(token_to_eval_type.at(current_token.token_type), current_token.token_value);
             advance();
-            return std::move(ret_value);
+            return value;
         }
         //( Expression )
         case TOKEN_LPAREN:
@@ -688,7 +856,7 @@ ASTPtr Parser::create_range_iter_node(ASTPtr&& start, ASTPtr&& stop, ASTPtr&& st
     return std::make_unique<ASTRangeIterator>(std::move(start), std::move(stop), std::move(step), iter_id, condition_or_construction);
 }
 
-ASTPtr Parser::create_block_node(std::vector<ASTPtr>&& statements)
+ASTPtr Parser::create_block_node(ListOfASTPtr&& statements)
 {
     return std::make_unique<ASTBlock>(std::move(statements));
 }
@@ -713,6 +881,17 @@ ASTPtr Parser::create_while_node(ASTPtr&& while_condition, ASTPtr&& while_body)
     return std::make_unique<ASTWhileNode>(std::move(while_condition), std::move(while_body));
 }
 
+ASTPtr Parser::create_func_decl_node(std::size_t starting_scope, EvalType return_type,
+                                    const std::string& func_name, FuncParams&& func_params, ASTPtr&& func_body)
+{
+    return std::make_unique<ASTFunctionDecl>(starting_scope, return_type, func_name, std::move(func_params), std::move(func_body));
+}
+
+ASTPtr Parser::create_func_call_node(FuncArgs&& func_args, ASTFunctionDecl* initial_func)
+{
+    return std::make_unique<ASTFunctionCall>(std::move(func_args), initial_func);
+}
+
 ASTPtr Parser::create_continue_node(std::uint8_t continue_params, std::uint16_t scopes_to_destroy)
 {
     return std::make_unique<ASTContinue>(continue_params, scopes_to_destroy);
@@ -721,6 +900,11 @@ ASTPtr Parser::create_continue_node(std::uint8_t continue_params, std::uint16_t 
 ASTPtr Parser::create_break_node(std::uint8_t break_params, std::uint16_t scopes_to_destroy)
 {
     return std::make_unique<ASTBreak>(break_params, scopes_to_destroy);
+}
+
+ASTPtr Parser::create_return_node(ASTPtr&& return_expr)
+{
+    return std::make_unique<ASTReturn>(std::move(return_expr));
 }
 
 //-----------------ACTUALLY Helper functions-----------------
@@ -771,7 +955,7 @@ std::pair<EvalType, std::uint16_t> Parser::get_type_from_symbol_table(const std:
     return std::make_pair(EVAL_UNKNOWN, 0);
 }
 
-//This variation is pretty much used for pre-evaluating expressions
+//This variation is pretty much used for pre-evaluating expressions, and function calls
 ASTRawPtr Parser::get_expr_from_symbol_table(const std::string& id)
 {
     for (auto it = temporary_symbol_table.rbegin(); it != temporary_symbol_table.rend(); ++it) {
@@ -802,10 +986,10 @@ void Parser::destroy_scope()
 }
 
 //------------------CT EVALUATOR------------------
-// Evaluate AST node at compile time
+//Evaluate AST node at compile time
 template<typename RV>
-constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
-    // Dispatch based on node type
+constexpr RV Parser::pre_evaluate_tree(const ASTNode& node) {
+    //Dispatch based on node type
     switch (node.getType())
     {
         case CTType::Value:
@@ -827,8 +1011,8 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
             const auto& binary_op_node = static_cast<const ASTBinaryOp&>(node);
             
             // For binary operations, recursively evaluate left and right sub-expressions
-            auto left = preEvaluateAST<RV>(*(binary_op_node.left));
-            auto right = preEvaluateAST<RV>(*(binary_op_node.right));
+            auto left = pre_evaluate_tree<RV>(*(binary_op_node.left));
+            auto right = pre_evaluate_tree<RV>(*(binary_op_node.right));
 
             switch (binary_op_node.op_type)
             {
@@ -859,7 +1043,7 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
         {
             const auto& unary_op_node = static_cast<const ASTUnaryOp&>(node);
             
-            auto expr = preEvaluateAST<RV>(*(unary_op_node.expr));
+            auto expr = pre_evaluate_tree<RV>(*(unary_op_node.expr));
 
             switch(unary_op_node.op_type)
             {
@@ -875,7 +1059,7 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
         {
             const auto& cast_node = static_cast<const ASTCastNode&>(node);
 
-            auto expr = preEvaluateAST<RV>(*(cast_node.eval_expr));
+            auto expr = pre_evaluate_tree<RV>(*(cast_node.eval_expr));
 
             switch (cast_node.eval_type)
             {
@@ -892,7 +1076,7 @@ constexpr RV Parser::preEvaluateAST(const ASTNode& node) {
             const auto& var_access_node = static_cast<const ASTVariableAccess&>(node);
 
             //Retrieve the value of variable and recursively evaluate it (the tree)
-            return preEvaluateAST<RV>(*get_expr_from_symbol_table(var_access_node.identifier));
+            return pre_evaluate_tree<RV>(*get_expr_from_symbol_table(var_access_node.identifier));
         }
         default:
             //Had an idea, if we cant pre evaluate it, EXCEPTION

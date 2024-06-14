@@ -1,7 +1,10 @@
 #include "file.hpp"
+/*
+    WILL OPTIMIZE THIS IN FUTURE, RN ITS HORRENDOUS
+*/
 
 //-----------------
-void FileWriter::writeToFile(const std::vector<Instruction> &commands)
+void FileWriter::writeToFile(const ListOfInstruction &commands)
 {
     //1st pass
     try {
@@ -13,61 +16,57 @@ void FileWriter::writeToFile(const std::vector<Instruction> &commands)
             //Write operand to file second, depending on what instruction, cast string operand to specific type
             switch (cmd.inst)
             {
-                //Integer operand
-                case PUSH_INT:
-                {
-                    int val = std::get<int>(cmd.value);
-                    outFile.write(reinterpret_cast<const Byte*>(&val), sizeof(int));
-                }
-                break;
-                //Floating operand
+                case PUSH_INT32:
+                    outFile.write(reinterpret_cast<const Byte*>(&std::get<std::int32_t>(cmd.value)), sizeof(std::int32_t));
+                    break;
+                case PUSH_UINT64:
+                    outFile.write(reinterpret_cast<const Byte*>(&std::get<std::size_t>(cmd.value)), sizeof(std::size_t));
+                    break;
                 case PUSH_FLOAT:
-                {
-                    float val = std::get<float>(cmd.value);
-                    outFile.write(reinterpret_cast<const Byte*>(&val), sizeof(float));
-                }
-                break;
-                //The actual instruction is already written, i just need to write the variable to the file
+                    outFile.write(reinterpret_cast<const Byte*>(&std::get<float>(cmd.value)), sizeof(float));
+                    break;
+
                 case ACCESS_VAR:
                 case ASSIGN_VAR:
                 case ASSIGN_VAR_NO_POP:
                 case REASSIGN_VAR:
                 case REASSIGN_VAR_NO_POP:
+                //Same for these
+                case DATAINST_ITER_ID:
                     writeStringToFile(std::get<std::string>(cmd.value));
                     break;
+                
                 case DATAINST_VAR_SCOPE_IDX:
-                //Same logic for this instruction as well
+                //Same logic for these instructions as well
                 case DESTROY_MULTIPLE_SYMBOL_TABLES:
+                case ITER_INIT:
                 {
                     //16bit uint value
-                    std::uint16_t scopeIndex = cmd.scopeIndexIfNeeded;
-                    outFile.write(reinterpret_cast<Byte*>(&scopeIndex), sizeof(std::uint16_t));
+                    std::uint16_t params16Bit = cmd.scopeIndexIfNeeded;
+                    outFile.write(reinterpret_cast<Byte*>(&params16Bit), sizeof(std::uint16_t));
                 }
                 break;
                 
                 case JUMP_IF_FALSE:
                 case JUMP:
-                //Iter has next and next pretty much have same operands as jump instructions
+                //Iter has next and next / Function call and destroy / Return pretty much have same operands as jump instructions
                 case ITER_HAS_NEXT:
                 case ITER_NEXT:
+                case FUNC_CONSTRUCT:
+                case FUNC_CALL:
+                case FUNC_END:
+                case RETURN:
                 {
                     auto offset = std::get<std::size_t>(cmd.value);
                     outFile.write(reinterpret_cast<Byte*>(&offset), sizeof(std::size_t));
                 }
                 break;
-                
-                case DATAINST_ITER_ID:
-                    writeStringToFile(std::get<std::string>(cmd.value));
-                    break;
-                case ITER_INIT:
-                {
-                    //specifically want a 16bit uint value
-                    std::uint16_t initParams = std::get<std::uint16_t>(cmd.value);
-                    outFile.write(reinterpret_cast<Byte*>(&initParams), sizeof(std::uint16_t));
-                }
-                break;
             }
         }
+    }
+    catch(std::bad_variant_access bva)
+    {
+        std::cout << "1st PASS EXCEPTIOM: " << bva.what() << '\n';
     }
     catch(std::exception e)
     {

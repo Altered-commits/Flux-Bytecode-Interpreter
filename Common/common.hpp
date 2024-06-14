@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <variant>
+#include <vector>
 
 //----------------------EVALUATED TYPES----------------------
 //A tag telling what the expression is going to evaluate to, either an Integer, Float, etc
@@ -12,9 +13,13 @@ enum EvalType : std::uint8_t
 {
     EVAL_INT,
     EVAL_FLOAT,
+    EVAL_VOID,
 
     //Expr evaluated to an iterator types
     EVAL_RANGE_ITER,
+
+    //Callable type: Function
+    EVAL_CALLABLE,
 
     //For unknown types
     EVAL_UNKNOWN
@@ -29,7 +34,8 @@ enum IteratorType : std::uint8_t
 //----------------------INSTRUCTIONS TYPES----------------------
 enum ILInstruction : std::uint8_t
 {
-    PUSH_INT,
+    PUSH_INT32,
+    PUSH_UINT64,
     PUSH_FLOAT,
     //Arithmetic instructions
     ADD,
@@ -76,12 +82,18 @@ enum ILInstruction : std::uint8_t
     CREATE_SYMBOL_TABLE,
     DESTROY_SYMBOL_TABLE,
     DESTROY_MULTIPLE_SYMBOL_TABLES, //Multiple levels
+    //Functions, Return
+    FUNC_CONSTRUCT,
+    FUNC_CALL,
+    FUNC_END,
+    RETURN,
+    USE_RETURN_VAL,
     //EOF
     END_OF_FILE
 };
 
 //----------------------INSTRUCTION----------------------
-using InstructionValue = std::variant<int, float, std::uint16_t, std::size_t, std::string>;
+using InstructionValue = std::variant<std::int32_t, float, std::uint16_t, std::size_t, std::string>;
 struct Instruction
 {
     InstructionValue value;
@@ -95,7 +107,7 @@ struct Instruction
         : inst(inst), value(std::move(value)), scopeIndexIfNeeded(scopeIndex)
     {}
 };
-
+using ListOfInstruction = std::vector<Instruction>;
 
 //----------------------File extension checker----------------------
 static bool checkFileExt(const char* const EXT, const char* filename)
@@ -108,4 +120,57 @@ static bool checkFileExt(const char* const EXT, const char* filename)
     return true;
 }
 
+//PURELY FOR DEBUGGING PURPOSES
+static const char* const ILInstructionToString(ILInstruction inst) {
+    // Static array for fast conversion
+    static constexpr const char* const ILInstructionStrings[] = {
+        "PUSH_INT32",
+        "PUSH_UINT64",
+        "PUSH_FLOAT",
+        "ADD",
+        "SUB",
+        "MUL",
+        "DIV",
+        "MOD",
+        "POW",
+        "NEG",
+        "ASSIGN_VAR",
+        "ASSIGN_VAR_NO_POP",
+        "REASSIGN_VAR",
+        "REASSIGN_VAR_NO_POP",
+        "ACCESS_VAR",
+        "DATAINST_VAR_SCOPE_IDX",
+        "CAST_INT",
+        "CAST_FLOAT",
+        "CMP_EQ",
+        "CMP_NEQ",
+        "CMP_GT",
+        "CMP_LT",
+        "CMP_GTEQ",
+        "CMP_LTEQ",
+        "AND",
+        "OR",
+        "NOT",
+        "JUMP_IF_FALSE",
+        "JUMP",
+        "ITER_INIT",
+        "ITER_HAS_NEXT",
+        "ITER_NEXT",
+        "ITER_CURRENT",
+        "ITER_RECALC_STEP",
+        "DATAINST_ITER_ID",
+        "CREATE_SYMBOL_TABLE",
+        "DESTROY_SYMBOL_TABLE",
+        "DESTROY_MULTIPLE_SYMBOL_TABLES",
+        "FUNC_CONSTRUCT",
+        "FUNC_CALL",
+        "FUNC_END",
+        "RETURN",
+        "USE_RETURN_VAL",
+        "END_OF_FILE"
+    };
+
+    // Convert enum value to string
+    return ILInstructionStrings[static_cast<std::size_t>(inst)];
+}
 #endif

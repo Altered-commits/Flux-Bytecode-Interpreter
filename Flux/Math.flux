@@ -1,5 +1,6 @@
-include Flux.CommonDefs.flux
+include Flux.Common.flux
 
+//Common defines found in math libraries
 define M_E        2.718281828459045
 define M_LOG2E    1.4426950408889634
 define M_LOG10E   0.4342944819032518
@@ -13,3 +14,24 @@ define M_2_PI     0.6366197723675814
 define M_2_SQRTPI 1.1283791670955126
 define M_SQRT2    1.4142135623730951
 define M_SQRT1_2  0.7071067811865476
+
+//Testing functions for making standard library
+Func<Int> Pow(Int base, Int power)
+{
+    Return base ^ power;
+}
+
+Func<Int> Sqrt(Int base, Int root)
+{
+    Return Pow(base, -root);
+}
+
+Func<Int> Abs(Int value)
+{
+    Return value < 0 ? -value : value;
+}
+
+Func<Int> Factorial(Int N)
+{
+    Return N == 1 ? N : N * Factorial(N - 1);
+}

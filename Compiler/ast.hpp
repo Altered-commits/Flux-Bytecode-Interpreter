@@ -9,7 +9,7 @@
 #include <memory>
 #include <string>
 #include "..\Common\common.hpp"
-#include "error_printer.hpp"
+#include "..\Common\error_printer.hpp"
 #include "type_checker.hpp"
 
 //Forward declare cuz the below std::unique_ptr is going to cry if not done
@@ -17,6 +17,11 @@ struct ASTNode;
 
 using ASTPtr    = std::unique_ptr<ASTNode>;
 using ASTRawPtr = ASTNode*;
+
+using ListOfASTPtr = std::vector<ASTPtr>;
+
+using FuncParams = std::vector<std::pair<EvalType, std::string>>;
+using FuncArgs   = ListOfASTPtr;
 
 //This thing will at max work for enum values under 64, cuz std::size_t aint 128bit
 constexpr std::size_t comparisionTypeMask = (1ULL << static_cast<std::size_t>(TOKEN_EEQ))
@@ -43,7 +48,7 @@ enum class CTType {
     VarAccess
 };
 
-//For the visitor pattern, we need to forward declare all the nodes, here we go
+//For the visitor pattern, we need to forward declare all the ast nodes
 struct ASTValue;
 struct ASTBinaryOp;
 struct ASTUnaryOp;
@@ -56,13 +61,16 @@ struct ASTIfNode;
 struct ASTRangeIterator;
 struct ASTForNode;
 struct ASTWhileNode;
+struct ASTFunctionDecl;
+struct ASTFunctionCall;
 struct ASTContinue;
 struct ASTBreak;
+struct ASTReturn;
+struct ASTDummyNode;
 
-//We will be using the -> Visitor Pattern
-//--------Visitor interface--------
-//The bool is there to tell if something is a sub expression, this is useful for many things such as
-//Multiple variable assignment: so that when something is assigned to variable, it doesnt pop the stack to get value
+//--------------VISITOR INTERFACE--------------
+//The bool is there to tell if something is a sub expression, this is useful for many things such as:
+// -Multiple variable assignment: so that when something is assigned to variable, it doesn't pop the stack to get value, etc
 class ASTVisitorInterface
 {
     public:
@@ -78,8 +86,12 @@ class ASTVisitorInterface
         virtual void visit(ASTRangeIterator& node, bool)  = 0;
         virtual void visit(ASTForNode& node, bool)        = 0;
         virtual void visit(ASTWhileNode& node, bool)      = 0;
+        virtual void visit(ASTFunctionDecl& node, bool)   = 0;
+        virtual void visit(ASTFunctionCall& node, bool)   = 0;
         virtual void visit(ASTContinue& node, bool)       = 0;
         virtual void visit(ASTBreak& node, bool)          = 0;
+        virtual void visit(ASTReturn& node, bool)         = 0;
+        virtual void visit(ASTDummyNode& node, bool)      = 0;
 };
 
 //AST nodes
@@ -90,9 +102,7 @@ struct ASTNode
     //Visitor
     virtual void accept(ASTVisitorInterface& visitor, bool is_sub_expr) = 0;
 
-    //AST Checks
-    virtual bool isFloat() const { return false; }
-    virtual bool isPowerOp() const { return false; }
+    virtual bool isCallable() const { return false; }
 
     //Think of it as a tag for each type
     virtual CTType getType() const { return CTType::NA; }
@@ -114,13 +124,6 @@ struct ASTValue : public ASTNode
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
         visitor.visit(*this, is_sub_expr);
-    }
-
-    bool isFloat() const override {
-        return type == EVAL_FLOAT;
-    }
-    bool isPowerOp() const override {
-        return false;
     }
 
     EvalType evaluateExprType() const override {
@@ -145,13 +148,6 @@ struct ASTBinaryOp : public ASTNode
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
         visitor.visit(*this, is_sub_expr);
-    }
-
-    bool isFloat() const override {
-        return left->isFloat() || right->isFloat();
-    }
-    bool isPowerOp() const override {
-        return op_type == TOKEN_POW || left->isPowerOp() || right->isPowerOp();
     }
 
     EvalType evaluateExprType() const override {
@@ -181,13 +177,6 @@ struct ASTUnaryOp : public ASTNode
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
         visitor.visit(*this, is_sub_expr);
-    }
-
-    bool isFloat() const override {
-        return expr->isFloat();
-    }
-    bool isPowerOp() const override {
-        return expr->isPowerOp();
     }
 
     EvalType evaluateExprType() const override {
@@ -223,13 +212,6 @@ struct ASTVariableAssign : public ASTNode
         visitor.visit(*this, is_sub_expr);
     }
 
-    bool isFloat() const override {
-        return var_type == EVAL_FLOAT;
-    }
-    bool isPowerOp() const override {
-        return expr->isPowerOp();
-    }
-
     EvalType evaluateExprType() const override {
         return var_type;
     }
@@ -250,8 +232,8 @@ struct ASTVariableAccess : public ASTNode
         visitor.visit(*this, is_sub_expr);
     }
 
-    bool isFloat() const override {
-        return var_type == EVAL_FLOAT;
+    bool isCallable() const {
+        return var_type == EVAL_CALLABLE;
     }
 
     EvalType evaluateExprType() const override {
@@ -277,10 +259,6 @@ struct ASTCastNode : public ASTNode
         visitor.visit(*this, is_sub_expr);
     }
 
-    bool isFloat() const override {
-        return eval_type == EVAL_FLOAT;
-    }
-
     EvalType evaluateExprType() const override {
         return eval_type;
     }
@@ -294,13 +272,13 @@ struct ASTCastNode : public ASTNode
 //Can be used for multiple stuff, holding statements is used in alot of stuff like lists etc etc
 struct ASTBlock : public ASTNode
 {
-    std::vector<ASTPtr> statements;
+    ListOfASTPtr statements;
 
-    ASTBlock(std::vector<ASTPtr>&& statements)
+    ASTBlock(ListOfASTPtr&& statements)
         : statements(std::move(statements))
     {}
 
-    const std::vector<ASTPtr>& getStatements() const {
+    const ListOfASTPtr& getStatements() const {
         return statements;
     }
 
@@ -323,14 +301,6 @@ struct ASTTernaryOp : public ASTNode
         visitor.visit(*this, is_sub_expr);
     }
 
-    bool isFloat() const override {
-        return true_expr->isFloat() || false_expr->isFloat();
-    }
-
-    bool isPowerOp() const override {
-        return true_expr->isPowerOp() || false_expr->isPowerOp();
-    }
-
     EvalType evaluateExprType() const override {
         //If this isnt float, then just return whatver the other expression is
         if (true_expr->evaluateExprType() == EVAL_FLOAT) {
@@ -343,15 +313,16 @@ struct ASTTernaryOp : public ASTNode
 //real
 struct ASTIfNode : ASTNode
 {
+    using ElifCondition = std::vector<std::pair<ASTPtr, ASTPtr>>;
     //If
     ASTPtr if_condition;
     ASTPtr if_body;
     //Multiple Elif's or no Elif: pair -> condition, body
-    std::vector<std::pair<ASTPtr, ASTPtr>> elif_clauses;
+    ElifCondition elif_clauses;
     //Else
     ASTPtr else_body;
 
-    ASTIfNode(ASTPtr&& ifc, ASTPtr&& ifb, std::vector<std::pair<ASTPtr, ASTPtr>>&& elfc, ASTPtr&& eb = nullptr)
+    ASTIfNode(ASTPtr&& ifc, ASTPtr&& ifb, ElifCondition&& elfc, ASTPtr&& eb = nullptr)
         : if_condition(std::move(ifc)), if_body(std::move(ifb)), elif_clauses(std::move(elfc)), else_body(std::move(eb))
     {}
 
@@ -400,7 +371,7 @@ struct ASTRangeIterator : public ASTBaseIterator
     }
 };
 
-//--------------BREAK / CONTINUE--------------
+//--------------BREAK / CONTINUE / RETURN--------------
 struct ASTContinue : public ASTNode
 {
     //For loop uses ITER_NEXT to go to next iteration, While loop doesn't
@@ -428,6 +399,26 @@ struct ASTBreak : public ASTNode
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
         visitor.visit(*this, is_sub_expr);
+    }
+};
+
+struct ASTReturn : public ASTNode
+{
+    ASTPtr return_expr;
+
+    ASTReturn(ASTPtr&& return_expr)
+        : return_expr(std::move(return_expr))
+    {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+
+    EvalType evaluateExprType() const override {
+        if(return_expr)
+            return return_expr->evaluateExprType();
+        
+        return EVAL_VOID;
     }
 };
 
@@ -460,4 +451,61 @@ struct ASTWhileNode : public ASTNode
     }
 };
 
+//--------------FUNCTIONS--------------
+struct ASTFunctionDecl : public ASTNode
+{
+    //Parameter -> Datatype, identifier
+    std::size_t starting_scope, starting_addr; //Set in ilgen
+    std::string function_name;
+    FuncParams  function_params;
+    EvalType    function_return_type;
+    ASTPtr      function_body;
+
+    ASTFunctionDecl(std::size_t starting_scope, EvalType func_ret_type, const std::string& func_name,
+                    FuncParams&& func_params, ASTPtr&& func_body)
+        : starting_scope(starting_scope), function_name(std::move(func_name)), function_params(std::move(func_params)),
+          function_return_type(func_ret_type), function_body(std::move(func_body))
+    {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+};
+
+struct ASTFunctionCall : public ASTNode
+{
+    FuncArgs         function_args;
+    ASTFunctionDecl* initial_func;
+
+    ASTFunctionCall(FuncArgs&& func_args, ASTFunctionDecl* initial_func)
+        : function_args(std::move(func_args)), initial_func(initial_func)
+    {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+
+    //To be able to assign function calls to variables as well
+    EvalType evaluateExprType() const override {
+        return initial_func->function_return_type;
+    }
+};
+
+//Dummy node for functions
+struct ASTDummyNode : public ASTNode
+{
+    EvalType type;
+
+    ASTDummyNode(EvalType type)
+        : type(type)
+    {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+
+    EvalType evaluateExprType() const override {
+        return type;
+    }
+};
 #endif

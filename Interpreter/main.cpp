@@ -22,9 +22,9 @@ int main(int argc, char** argv)
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    ByteCodeInterpreter bct{argv[1]};
-    bct.interpret();
-
+    ByteCodeInterpreter::getInstance().setFile(filename);
+    ByteCodeInterpreter::getInstance().interpret();
+    
     //End of Compilation
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << "Time to interpret: " <<

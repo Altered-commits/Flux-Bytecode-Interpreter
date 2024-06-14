@@ -9,26 +9,41 @@
 
 #include "file.hpp"
 #include "ast.hpp"
-#include "error_printer.hpp"
+#include "..\Common\error_printer.hpp"
 #include "..\Common\common.hpp" //Common between Interpreter and Compiler
 #include "common.hpp" //Common for files in Compiler only
 
 //Force generate these instructions (strictly to be used in ILGenerator member functions)
+#define INC_CURRENT_OFFSET     ++currentScopeOffset.back();
+#define INCN_CURRENT_OFFSET(N) currentScopeOffset.back() += N;
+#define GET_CURRENT_OFFSET     currentScopeOffset.back()
+#define NEW_OFFSET_SCOPE       currentScopeOffset.emplace_back(0);
+#define DELETE_OFFSET_SCOPE    currentScopeOffset.pop_back();
+
 #define SCOPE_START std::cout << "CREATE_SCOPE\n";\
-                    il_code.emplace_back(ILInstruction::CREATE_SYMBOL_TABLE);
+                    il_code.emplace_back(ILInstruction::CREATE_SYMBOL_TABLE);\
+                    INC_CURRENT_OFFSET
 #define SCOPE_END std::cout << "DESTROY_SCOPE\n";\
-                    il_code.emplace_back(ILInstruction::DESTROY_SYMBOL_TABLE);
+                    il_code.emplace_back(ILInstruction::DESTROY_SYMBOL_TABLE);\
+                    INC_CURRENT_OFFSET
 
 #define IL_LOOP_START cb_info.emplace_back(il_code.size(), std::vector<size_t>{});
 #define IL_LOOP_END   cb_info.pop_back();
 
+#define IL_FUNC_START return_addr.emplace_back(ListOfSizeT{});
+#define IL_FUNC_END   return_addr.pop_back();
+
+//Useful stuff
+using ListOfSizeT       = std::vector<std::size_t>;
+using ContinueBreakInfo = std::vector<std::pair<std::size_t, ListOfSizeT>>;
+
 class ILGenerator : public ASTVisitorInterface {
     public:
-        ILGenerator(std::vector<ASTPtr>&& ast)
+        ILGenerator(ListOfASTPtr&& ast)
             : ast_statements(std::move(ast))
         {}
 
-        std::vector<Instruction>& generateIL();
+        ListOfInstruction& generateIL();
 
     private:
         void visit(ASTValue&, bool);
@@ -43,20 +58,30 @@ class ILGenerator : public ASTVisitorInterface {
         void visit(ASTIfNode&, bool);
         void visit(ASTForNode&, bool);
         void visit(ASTWhileNode&, bool);
+        void visit(ASTFunctionDecl& node, bool);
+        void visit(ASTFunctionCall& node, bool);
         void visit(ASTContinue&, bool);
         void visit(ASTBreak&, bool);
+        void visit(ASTReturn& node, bool);
+        void visit(ASTDummyNode& node, bool);
 
     //Helper function
     private:
         void handleBreakIfExists(std::size_t);
+        void handleReturnIfExists(std::size_t);
 
     private:
     //Temporary solution for Continue / Break
         //Pair -> First is for Continue statements, Second is for Break statements
-        std::vector<std::pair<std::size_t, std::vector<std::size_t>>> cb_info;
+        ContinueBreakInfo cb_info; //Will be changed later
 
-        std::vector<ASTPtr>    ast_statements;
-        std::vector<Instruction> il_code;
+    //Return addrs (function nesting exists so yeah)
+        std::vector<ListOfSizeT> return_addr;
+        
+        ListOfSizeT currentScopeOffset = {0};
+
+        ListOfASTPtr            ast_statements;
+        ListOfInstruction       il_code;
     
     private: //FileWriter
 

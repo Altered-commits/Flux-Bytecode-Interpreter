@@ -15,8 +15,11 @@ std::vector<std::unordered_map<std::string, Object>> globalSymbolTable;
 //Iterator stack
 std::vector<IterPtr> globalIteratorStack;
 
+//Emulating register (sort of) for return value
+Object returnRegister;
+
 //Think of this as program counter
-std::size_t globalInstructionIndex = 0;
+std::uint64_t globalInstructionIndex = 0;
 
 void ByteCodeInterpreter::handleArithmeticOperators(ILInstruction inst)
 {
@@ -192,9 +195,55 @@ void ByteCodeInterpreter::handleIteratorNext(std::size_t jumpOffset)
     globalInstructionIndex = jumpOffset - 1;
 }
 
+void ByteCodeInterpreter::handleReturn(std::size_t returnParams)
+{
+    constexpr std::size_t numBitsToShift = (sizeof(std::size_t) * CHAR_BIT) - 1;
+    constexpr std::size_t topBit         = (std::size_t)1 << numBitsToShift;
+    constexpr std::size_t allBitsExceptTopBit = ~topBit;
+    
+    std::size_t shouldReturn = returnParams & topBit;
+    std::size_t returnIndex  = returnParams & allBitsExceptTopBit;
+
+    //We can return
+    if(shouldReturn) {
+        returnRegister = std::move(globalStack.back());
+        globalStack.pop_back();
+    }
+    //Jump to FUNC_END and let it handle the rest
+    globalInstructionIndex = returnIndex - 1;
+}
+
+void ByteCodeInterpreter::handleFunctionEnd(std::size_t funcStartScope)
+{
+    //Destroy function scope and set globalInstructionIndex to what it was before function call
+    destroyFunctionScope(static_cast<std::uint16_t>(funcStartScope));
+
+    auto val = std::get<std::uint64_t>(globalStack.back());
+    globalInstructionIndex = val - 1;
+
+    globalStack.pop_back();
+}
+
+void ByteCodeInterpreter::setFile(const char* filename)
+{
+    inFile.open(filename, std::ios_base::binary);
+            
+    if (!inFile) {
+        std::cerr << "[FileReadingError]: Error opening file: " << filename << '\n';
+        std::exit(1);
+    }
+}
+
 void ByteCodeInterpreter::decodeFile()
 {
     bool hasInst = true;
+    
+    //Inefficient ahhh
+    std::vector<std::pair<std::size_t, ListOfInstruction>> functionStack;
+    //Think of this as a main function
+    functionStack.emplace_back(0, ListOfInstruction{});
+    //Using this so i can change where i can emplace instructions
+    ListOfInstruction* refToInstructionList = &(functionStack.back().second);
 
     //Our buffer which will store chunks of file
     std::size_t       chunkBufferIndex;
@@ -216,33 +265,56 @@ void ByteCodeInterpreter::decodeFile()
         switch (inst)
         {
             case END_OF_FILE:
-                instructions.emplace_back(inst);
+                refToInstructionList->emplace_back(inst);
                 hasInst = false;
                 break;
+            
+            case FUNC_CONSTRUCT:
+            {   
+                std::size_t funcStartIndex = readOperand<std::size_t>(chunkBuffer, chunkBufferIndex);
+                functionStack.emplace_back(funcStartIndex, ListOfInstruction{});
+                refToInstructionList = &(functionStack.back().second);
+            }
+            break;
+
+            case FUNC_END:
+            {
+                //Emplace FUNC_END instruction before creating a function frame
+                refToInstructionList->emplace_back(ILInstruction::FUNC_END, readOperand<std::size_t>(chunkBuffer, chunkBufferIndex));
+
+                //Create the frame now
+                std::size_t funcStartIndex = functionStack.back().first;
+                functionTable.emplace(funcStartIndex, std::move(functionStack.back().second));
+                functionStack.pop_back();
+                refToInstructionList = &(functionStack.back().second);
+            }
+            break;
+
             //Primitive types
-            case PUSH_INT:
-                //Read operand as int
-                instructions.emplace_back(inst, readOperand<int>(chunkBuffer, chunkBufferIndex));
+            case PUSH_INT32:
+                refToInstructionList->emplace_back(inst, readOperand<std::int32_t>(chunkBuffer, chunkBufferIndex));
+                break;
+            case PUSH_UINT64:
+                refToInstructionList->emplace_back(inst, readOperand<std::uint64_t>(chunkBuffer, chunkBufferIndex));
                 break;
             case PUSH_FLOAT:
-                //Read operand as float
-                instructions.emplace_back(inst, readOperand<float>(chunkBuffer, chunkBufferIndex));
+                refToInstructionList->emplace_back(inst, readOperand<float>(chunkBuffer, chunkBufferIndex));
                 break;
 
             //Variable assignment / accessing
             case ILInstruction::ASSIGN_VAR:
             case ILInstruction::ASSIGN_VAR_NO_POP:
-                instructions.emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)), 0);
+                refToInstructionList->emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)), 0);
                 break;
             //But for these instruction, these will be followed by a DATAINST_VAR_SCOPE_IDX instruction containing the index
             case ILInstruction::REASSIGN_VAR:
             case ILInstruction::REASSIGN_VAR_NO_POP:
             case ILInstruction::ACCESS_VAR:
-                instructions.emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)),
-                                        instructions[instructions.size() - 1].scopeIndexIfNeeded);
+                refToInstructionList->emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)),
+                                        (*refToInstructionList)[refToInstructionList->size() - 1].scopeIndexIfNeeded);
                 break;
             case ILInstruction::DATAINST_VAR_SCOPE_IDX:
-                instructions.emplace_back(inst, 0, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
+                refToInstructionList->emplace_back(inst, 0, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
                 break;
             
             //Jump cases
@@ -251,35 +323,44 @@ void ByteCodeInterpreter::decodeFile()
             //As they have same operands to decode, just put them here
             case ILInstruction::ITER_HAS_NEXT:
             case ILInstruction::ITER_NEXT:
-                instructions.emplace_back(inst, readOperand<std::size_t>(chunkBuffer, chunkBufferIndex));
+            case ILInstruction::FUNC_CALL:
+            case ILInstruction::RETURN:
+                refToInstructionList->emplace_back(inst, readOperand<std::size_t>(chunkBuffer, chunkBufferIndex));
                 break;
             
             //Iterator
             case ILInstruction::DATAINST_ITER_ID:
-                instructions.emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)));
+                refToInstructionList->emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)));
                 break;
             case ILInstruction::ITER_INIT:
             //Same for this instruction
             case ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES:
-                instructions.emplace_back(inst, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
+                refToInstructionList->emplace_back(inst, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
                 break;
             //Rest of it just read instruction
             default:
-                instructions.emplace_back(inst);
+                refToInstructionList->emplace_back(inst);
                 break;
         }
     }
+
+    //Move the so called main function scope thingy to 'instructions' as its the first thing used by interpretInstructions
+    instructions = std::move(functionStack.back().second);
 }
 
-void ByteCodeInterpreter::interpretInstructions()
+void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstructions)
 {
+    if(currentRecursionDepth > maxRecursionDepth)
+        printRuntimeError("RecursionError", "Max recursion depth reached, over 10,000 function calls");
+
     while(true)
     {
-        Instruction& i = instructions[globalInstructionIndex];
+        Instruction& i = externalInstructions[globalInstructionIndex];
 
         switch (i.inst)
         {
-            case ILInstruction::PUSH_INT:
+            case ILInstruction::PUSH_INT32:
+            case ILInstruction::PUSH_UINT64:
             case ILInstruction::PUSH_FLOAT:
                 pushInstructionValue(i.value);
                 break;
@@ -289,7 +370,7 @@ void ByteCodeInterpreter::interpretInstructions()
                 handleUnaryOperators();
                 break;
             
-            //Integer Operations, idk if this is even the right way
+            //Arithmetic Operations, idk if this is even the right way
             case ILInstruction::ADD:
             case ILInstruction::SUB:
             case ILInstruction::MUL:
@@ -364,11 +445,33 @@ void ByteCodeInterpreter::interpretInstructions()
             case ILInstruction::DESTROY_SYMBOL_TABLE:
                 destroySymbolTable();
                 break;
-            
             case ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES:
                 destroyMultipleSymbolTables(std::get<std::uint16_t>(i.value));
                 break;
+            
+            //Functions and return values
+            //Return address is already saved to stack, call function resetting instruction index to 0
+            case ILInstruction::FUNC_CALL:
+            {
+                globalInstructionIndex = 0;
+                IN_FUNC
+                ByteCodeInterpreter::getInstance().interpretInstructions(functionTable.at(std::get<std::size_t>(i.value) - 1));
+                OUT_FUNC
+            }
+                break;
+            case ILInstruction::FUNC_END:
+                handleFunctionEnd(std::get<std::size_t>(i.value));
+                return;
+            //Place the value in returnRegister
+            case RETURN:
+                handleReturn(std::get<std::size_t>(i.value));
+                break;
+            //Will optimize this later
+            case USE_RETURN_VAL:
+                globalStack.emplace_back(std::move(returnRegister));
+                break;
 
+            //EOFFFFFFFFFFFFF
             case END_OF_FILE:
                 std::cout << "Successfully Interpreted, Read all symbols.\n";
 
@@ -401,7 +504,7 @@ void ByteCodeInterpreter::interpret()
     auto start_ii = std::chrono::high_resolution_clock::now();
 
     //Execute instructions
-    interpretInstructions();
+    interpretInstructions(instructions);
 
     auto end_ii = std::chrono::high_resolution_clock::now();
 
@@ -482,7 +585,9 @@ void ByteCodeInterpreter::pushInstructionValue(const InstructionValue& val)
     std::visit([&](auto&& arg){
         using T = std::decay_t<decltype(arg)>;
 
-        if constexpr(std::is_same_v<T, int> || std::is_same_v<T, float>)
+        if constexpr(std::is_same_v<T, std::int32_t>
+                    || std::is_same_v<T, std::uint64_t>
+                    || std::is_same_v<T, float>)
             globalStack.emplace_back(std::move(arg));
     }, val);
 }
@@ -490,22 +595,44 @@ void ByteCodeInterpreter::pushInstructionValue(const InstructionValue& val)
 //Symbol table related
 void ByteCodeInterpreter::createSymbolTable()
 {
+    ++currentScope;
     globalSymbolTable.emplace_back();
 }
 
 void ByteCodeInterpreter::destroySymbolTable()
 {
+    --currentScope;
     globalSymbolTable.pop_back();   
 }
 
 void ByteCodeInterpreter::destroyMultipleSymbolTables(std::uint16_t scopesToDestroy)
 {
+    currentScope = std::max(0, currentScope - scopesToDestroy);
     globalSymbolTable.erase(globalSymbolTable.end() - scopesToDestroy, globalSymbolTable.end());
+}
+
+void ByteCodeInterpreter::destroyFunctionScope(std::uint16_t scopesToDestroy)
+{
+    currentScope = std::max(0, currentScope - scopesToDestroy);
+    globalSymbolTable.erase(globalSymbolTable.begin() + scopesToDestroy - 1, globalSymbolTable.end());
 }
 
 const Object& ByteCodeInterpreter::getValueFromNthFrame(const std::string& id, const std::uint8_t scopeIndex)
 {
-    return globalSymbolTable[scopeIndex].at(id);
+    //Functions use the slower version of symbol table getter thingy cuz,
+    if(isFunctionOngoing)
+        //If u can't get value from scope index, fuck compiler and fuck you.
+        for (std::int32_t i = currentScope; i >= 0; --i)
+        {
+            auto& table = globalSymbolTable[i];
+            auto  value = table.find(id);
+            if(value != table.end())
+                return value->second;
+        }
+    else
+        return globalSymbolTable[scopeIndex].at(id);
+    
+    printRuntimeError("WTF?", "How did you even reach to this state, bruh?");
 }
 
 void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object&& elem)

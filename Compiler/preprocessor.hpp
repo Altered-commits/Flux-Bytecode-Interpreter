@@ -8,7 +8,7 @@
 #include <unordered_set>
 #include <algorithm>
 
-#include "error_printer.hpp"
+#include "..\Common\error_printer.hpp"
 
 class Preprocessor
 {

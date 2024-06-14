@@ -19,7 +19,7 @@ class FileWriter {
             }
         }
 
-        void writeToFile(const std::vector<Instruction>& commands);
+        void writeToFile(const ListOfInstruction& commands);
     
     private:
         void writeStringToFile(const std::string& str);
