@@ -88,7 +88,7 @@ class Parser
         ASTPtr create_range_iter_node(ASTPtr&&, ASTPtr&&, ASTPtr&&, const std::string&, bool);
         ASTPtr create_for_node(const std::string&, ASTPtr&&, ASTPtr&&);
         ASTPtr create_while_node(ASTPtr&&, ASTPtr&&);
-        ASTPtr create_func_decl_node(std::size_t, EvalType, const std::string&, FuncParams&&, ASTPtr&&);
+        ASTPtr create_func_decl_node(EvalType, const std::string&, FuncParams&&, ASTPtr&&);
         ASTPtr create_func_call_node(FuncArgs&&, ASTFunctionDecl*);
         ASTPtr create_continue_node(std::uint8_t, std::uint16_t);
         ASTPtr create_break_node(std::uint8_t, std::uint16_t);

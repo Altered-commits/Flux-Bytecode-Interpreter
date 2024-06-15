@@ -52,9 +52,8 @@ void FileWriter::writeToFile(const ListOfInstruction &commands)
                 //Iter has next and next / Function call and destroy / Return pretty much have same operands as jump instructions
                 case ITER_HAS_NEXT:
                 case ITER_NEXT:
-                case FUNC_CONSTRUCT:
+                case FUNC_START:
                 case FUNC_CALL:
-                case FUNC_END:
                 case RETURN:
                 {
                     auto offset = std::get<std::size_t>(cmd.value);

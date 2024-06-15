@@ -467,8 +467,8 @@ void ILGenerator::visit(ASTFunctionDecl& func_decl_node, bool is_sub_expr)
 {
     NEW_OFFSET_SCOPE
     //Mark starting of function call
-    std::cout << "FUNC_CONSTRUCT\n";
-    il_code.emplace_back(ILInstruction::FUNC_CONSTRUCT, il_code.size());
+    std::cout << "FUNC_START\n";
+    il_code.emplace_back(ILInstruction::FUNC_START, il_code.size());
 
     //Later used for function calls
     func_decl_node.starting_addr = il_code.size();
@@ -485,8 +485,8 @@ void ILGenerator::visit(ASTFunctionDecl& func_decl_node, bool is_sub_expr)
     
     func_decl_node.function_body->accept(*this, is_sub_expr);
 
-    std::cout << "FUNC_END " << func_decl_node.starting_scope << '\n';
-    il_code.emplace_back(ILInstruction::FUNC_END, func_decl_node.starting_scope);
+    std::cout << "FUNC_END\n";
+    il_code.emplace_back(ILInstruction::FUNC_END);
     INC_CURRENT_OFFSET
 
     handleReturnIfExists(GET_CURRENT_OFFSET - 1);

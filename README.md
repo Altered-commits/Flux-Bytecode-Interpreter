@@ -11,6 +11,7 @@ Flux is a custom-built bytecode interpreter currently under development. This pr
    - If-Elif-Else conditions.
    - For loop (Iterator based).
    - While loop (Condition based).
+   - Functions (Without variadic arguments).
  - Decently fast Bytecode Interpreter.
 
 ## Usage
@@ -28,7 +29,7 @@ To interpret, use the following command:<br>
 #### Note: Interpreter can interpret any compiled flux file with the extension `.cflx`
 
 ## Future plans:
-1. Functions, maybe even structs.<br>
+1. Making standard library sort of thing, lists, strings.<br>
 2. Optimizing Compiler and Interpreter.<br>
 
 **---See the grammar.txt file to get an idea of syntax---**

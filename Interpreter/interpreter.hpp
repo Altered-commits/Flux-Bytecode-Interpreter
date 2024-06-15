@@ -26,9 +26,11 @@ using FunctionTable = std::unordered_map<std::size_t, ListOfInstruction>;
 //Again to be strictly used in ByteCodeInterpreter member functions
 #define IN_FUNC bool prevFuncStatus = isFunctionOngoing;\
                      isFunctionOngoing = true;\
-                    ++currentRecursionDepth;
+                   ++currentRecursionDepth;\
+                     functionStartingScope.emplace_back(globalSymbolTable.size());
 #define OUT_FUNC isFunctionOngoing = prevFuncStatus;\
-                    --currentRecursionDepth;
+                    --currentRecursionDepth;\
+                    functionStartingScope.pop_back();
 
 class ByteCodeInterpreter {
     private:
@@ -67,14 +69,14 @@ class ByteCodeInterpreter {
         void handleIteratorNext(std::size_t);
         //Function and Return
         void handleReturn(std::size_t);
-        void handleFunctionEnd(std::size_t);
+        void handleFunctionEnd();
     
     //Symbol table related
     private:
         void          createSymbolTable();
         void          destroySymbolTable();
         void          destroyMultipleSymbolTables(std::uint16_t);
-        void          destroyFunctionScope(std::uint16_t);
+        void          destroyFunctionScope();
         void          setValueToTopFrame(const std::string&, Object&&);
         void          setValueToNthFrame(const std::string&, Object&&, const std::uint8_t);
         const Object& getValueFromNthFrame(const std::string&, const std::uint8_t);
@@ -102,5 +104,6 @@ class ByteCodeInterpreter {
         FunctionTable     functionTable;
         bool              isFunctionOngoing = false;
         std::uint32_t     maxRecursionDepth = 10000, currentRecursionDepth = 0;
+        std::vector<std::uint16_t> functionStartingScope;
 };
 #endif

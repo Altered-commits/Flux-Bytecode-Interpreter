@@ -4,8 +4,12 @@
               | 'If' '(' <EXPRESSION> ')' '{' <STATEMENT>* '}' <ELIF_CLAUSES> <ELSE_BLOCK>
               | 'For' <identifier> 'in' <ITERATOR> '{' <STATEMENT>* '}'
               | 'While' '(' <COMP_EXPRESSION> ')' '{' <STATEMENT>* '}'
+              | 'Func' '<' TYPE '>' <identifier> '(' <LIST_EXPR> ')' '{' <STATEMENT>* '}'
               | 'Continue'
               | 'Break'
+              | 'Return'
+
+<LIST_EXPR> ::= [<EXPRESSION> (',' <EXPRESSION>)*]
 
 <ELIF_CLAUSES> ::= <ELIF_CLAUSE>*
 <ELIF_CLAUSE> ::= 'Elif' '(' <EXPRESSION> ')' '{' <STATEMENT>* '}'

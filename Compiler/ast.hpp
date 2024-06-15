@@ -455,15 +455,15 @@ struct ASTWhileNode : public ASTNode
 struct ASTFunctionDecl : public ASTNode
 {
     //Parameter -> Datatype, identifier
-    std::size_t starting_scope, starting_addr; //Set in ilgen
+    std::size_t starting_addr; //Set in ilgen
     std::string function_name;
     FuncParams  function_params;
     EvalType    function_return_type;
     ASTPtr      function_body;
 
-    ASTFunctionDecl(std::size_t starting_scope, EvalType func_ret_type, const std::string& func_name,
+    ASTFunctionDecl(EvalType func_ret_type, const std::string& func_name,
                     FuncParams&& func_params, ASTPtr&& func_body)
-        : starting_scope(starting_scope), function_name(std::move(func_name)), function_params(std::move(func_params)),
+        : function_name(std::move(func_name)), function_params(std::move(func_params)),
           function_return_type(func_ret_type), function_body(std::move(func_body))
     {}
 

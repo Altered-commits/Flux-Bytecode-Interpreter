@@ -74,8 +74,7 @@ ListOfASTPtr Parser::parse_list(TokenType starting_token, TokenType ending_token
 ASTPtr Parser::parse_function_decl()
 {
     create_scope();
-    std::size_t current_scope = temporary_symbol_table.size();
-    EvalType    return_type   = parse_type_as_param();
+    EvalType return_type = parse_type_as_param();
     
     if(!match_types(TOKEN_ID))
         printError("ParserError", "Expected identifier for function name");
@@ -110,7 +109,7 @@ ASTPtr Parser::parse_function_decl()
     advance();
 
     //Pre set it to symbol table once to allow recursive calls to be a thing
-    auto func_node = create_func_decl_node(current_scope, return_type, identifier, std::move(func_params), nullptr);
+    auto func_node = create_func_decl_node(return_type, identifier, std::move(func_params), nullptr);
     set_value_to_top_frame(identifier, func_node, EVAL_CALLABLE);
     
     SAVE_RETURN_TYPE(return_type)
@@ -881,10 +880,10 @@ ASTPtr Parser::create_while_node(ASTPtr&& while_condition, ASTPtr&& while_body)
     return std::make_unique<ASTWhileNode>(std::move(while_condition), std::move(while_body));
 }
 
-ASTPtr Parser::create_func_decl_node(std::size_t starting_scope, EvalType return_type,
-                                    const std::string& func_name, FuncParams&& func_params, ASTPtr&& func_body)
+ASTPtr Parser::create_func_decl_node(EvalType return_type, const std::string& func_name,
+                                    FuncParams&& func_params, ASTPtr&& func_body)
 {
-    return std::make_unique<ASTFunctionDecl>(starting_scope, return_type, func_name, std::move(func_params), std::move(func_body));
+    return std::make_unique<ASTFunctionDecl>(return_type, func_name, std::move(func_params), std::move(func_body));
 }
 
 ASTPtr Parser::create_func_call_node(FuncArgs&& func_args, ASTFunctionDecl* initial_func)

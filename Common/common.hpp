@@ -83,7 +83,7 @@ enum ILInstruction : std::uint8_t
     DESTROY_SYMBOL_TABLE,
     DESTROY_MULTIPLE_SYMBOL_TABLES, //Multiple levels
     //Functions, Return
-    FUNC_CONSTRUCT,
+    FUNC_START,
     FUNC_CALL,
     FUNC_END,
     RETURN,
@@ -162,7 +162,7 @@ static const char* const ILInstructionToString(ILInstruction inst) {
         "CREATE_SYMBOL_TABLE",
         "DESTROY_SYMBOL_TABLE",
         "DESTROY_MULTIPLE_SYMBOL_TABLES",
-        "FUNC_CONSTRUCT",
+        "FUNC_START",
         "FUNC_CALL",
         "FUNC_END",
         "RETURN",

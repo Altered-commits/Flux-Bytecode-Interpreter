@@ -213,10 +213,10 @@ void ByteCodeInterpreter::handleReturn(std::size_t returnParams)
     globalInstructionIndex = returnIndex - 1;
 }
 
-void ByteCodeInterpreter::handleFunctionEnd(std::size_t funcStartScope)
+void ByteCodeInterpreter::handleFunctionEnd()
 {
     //Destroy function scope and set globalInstructionIndex to what it was before function call
-    destroyFunctionScope(static_cast<std::uint16_t>(funcStartScope));
+    destroyFunctionScope();
 
     auto val = std::get<std::uint64_t>(globalStack.back());
     globalInstructionIndex = val - 1;
@@ -269,7 +269,7 @@ void ByteCodeInterpreter::decodeFile()
                 hasInst = false;
                 break;
             
-            case FUNC_CONSTRUCT:
+            case FUNC_START:
             {   
                 std::size_t funcStartIndex = readOperand<std::size_t>(chunkBuffer, chunkBufferIndex);
                 functionStack.emplace_back(funcStartIndex, ListOfInstruction{});
@@ -280,7 +280,7 @@ void ByteCodeInterpreter::decodeFile()
             case FUNC_END:
             {
                 //Emplace FUNC_END instruction before creating a function frame
-                refToInstructionList->emplace_back(ILInstruction::FUNC_END, readOperand<std::size_t>(chunkBuffer, chunkBufferIndex));
+                refToInstructionList->emplace_back(ILInstruction::FUNC_END);
 
                 //Create the frame now
                 std::size_t funcStartIndex = functionStack.back().first;
@@ -460,7 +460,7 @@ void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstr
             }
                 break;
             case ILInstruction::FUNC_END:
-                handleFunctionEnd(std::get<std::size_t>(i.value));
+                handleFunctionEnd();
                 return;
             //Place the value in returnRegister
             case RETURN:
@@ -611,10 +611,11 @@ void ByteCodeInterpreter::destroyMultipleSymbolTables(std::uint16_t scopesToDest
     globalSymbolTable.erase(globalSymbolTable.end() - scopesToDestroy, globalSymbolTable.end());
 }
 
-void ByteCodeInterpreter::destroyFunctionScope(std::uint16_t scopesToDestroy)
+void ByteCodeInterpreter::destroyFunctionScope()
 {
-    currentScope = std::max(0, currentScope - scopesToDestroy);
-    globalSymbolTable.erase(globalSymbolTable.begin() + scopesToDestroy - 1, globalSymbolTable.end());
+    std::size_t fallbackToScope = functionStartingScope.back();
+    globalSymbolTable.resize(fallbackToScope);
+    currentScope = fallbackToScope - 1;
 }
 
 const Object& ByteCodeInterpreter::getValueFromNthFrame(const std::string& id, const std::uint8_t scopeIndex)

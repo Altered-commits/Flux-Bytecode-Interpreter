@@ -1,5 +1,8 @@
 include Flux.Math.flux
 
-Int powerFactorial = Factorial(Pow(2, 3));
+Int j = FALSE;
 
-powerFactorial;
+If(Factorial(Pow(2, 4)) > 100) {
+    j = TRUE;
+}
+j;
