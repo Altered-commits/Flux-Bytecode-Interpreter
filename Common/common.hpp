@@ -34,7 +34,7 @@ enum IteratorType : std::uint8_t
 //----------------------INSTRUCTIONS TYPES----------------------
 enum ILInstruction : std::uint8_t
 {
-    PUSH_INT32,
+    PUSH_INT64,
     PUSH_UINT64,
     PUSH_FLOAT,
     //Arithmetic instructions
@@ -64,6 +64,7 @@ enum ILInstruction : std::uint8_t
     CMP_LT,
     CMP_GTEQ,
     CMP_LTEQ,
+    CMP_IS,
     //Logical operations
     AND,
     OR,
@@ -93,7 +94,7 @@ enum ILInstruction : std::uint8_t
 };
 
 //----------------------INSTRUCTION----------------------
-using InstructionValue = std::variant<std::int32_t, float, std::uint16_t, std::size_t, std::string>;
+using InstructionValue = std::variant<std::int64_t, std::uint64_t, double, std::uint16_t, std::string>;
 struct Instruction
 {
     InstructionValue value;
@@ -124,7 +125,7 @@ static bool checkFileExt(const char* const EXT, const char* filename)
 static const char* const ILInstructionToString(ILInstruction inst) {
     // Static array for fast conversion
     static constexpr const char* const ILInstructionStrings[] = {
-        "PUSH_INT32",
+        "PUSH_INT64",
         "PUSH_UINT64",
         "PUSH_FLOAT",
         "ADD",

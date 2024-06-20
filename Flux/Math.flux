@@ -33,5 +33,18 @@ Func<Int> Abs(Int value)
 
 Func<Int> Factorial(Int N)
 {
-    Return N == 1 ? N : N * Factorial(N - 1);
+    Return (N < 1 || N == 1) ? N : N * Factorial(N - 1);
+}
+
+Func<Int> GCD(Int a, Int b)
+{
+    If (b == 0) {
+        Return a;
+    }
+    Return GCD(b, a % b);
+}
+
+Func<Int> LCM(Int a, Int b)
+{
+    Return (a * b) / GCD(a, b);
 }

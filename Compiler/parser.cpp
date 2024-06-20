@@ -73,6 +73,9 @@ ListOfASTPtr Parser::parse_list(TokenType starting_token, TokenType ending_token
 //-----------------TECHNICALLY Helper Functions-----------------
 ASTPtr Parser::parse_function_decl()
 {
+    //For dummy nodes so they have some lifetime and not instantly be dead
+    ListOfASTPtr temporary_dummy_scope;
+
     create_scope();
     EvalType return_type = parse_type_as_param();
     
@@ -95,7 +98,11 @@ ASTPtr Parser::parse_function_decl()
         if(!match_types(TOKEN_ID))
             printError("ParserError", "Expected identifier after type");
 
-        set_value_to_top_frame(current_token.token_value, std::make_unique<ASTDummyNode>(param_type), param_type);
+        //Create dummy node, set its value in symbol table, move its pointer to dummy scope where its lifetime is managed
+        ASTPtr dummy_expr = std::make_unique<ASTDummyNode>(param_type);
+        set_value_to_top_frame(current_token.token_value, dummy_expr, param_type);
+        temporary_dummy_scope.emplace_back(std::move(dummy_expr));
+
         func_params.emplace_back(param_type, std::move(current_token.token_value));
         advance();
 
@@ -289,9 +296,9 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
         {
             //I will make ilgen send a special instruction to recalculate this
             try {
-                int eval_start = pre_evaluate_tree<int>(*start);
-                int eval_stop  = pre_evaluate_tree<int>(*stop);
-
+                std::int64_t eval_start = pre_evaluate_tree<std::int64_t>(*start);
+                std::int64_t eval_stop  = pre_evaluate_tree<std::int64_t>(*stop);
+                
                 //If we are evaluating, might as well use this value instead of whole ass tree
                 start = create_value_node(EVAL_INT, std::to_string(eval_start));
                 stop  = create_value_node(EVAL_INT, std::to_string(eval_stop));
@@ -306,20 +313,20 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
         else {
             //I dont want to do this entire thing during runtime, for integer variation its easy, this isn't
             try {
-                float eval_start = pre_evaluate_tree<float>(*start);
-                float eval_stop  = pre_evaluate_tree<float>(*stop);
+                std::double_t eval_start = pre_evaluate_tree<std::double_t>(*start);
+                std::double_t eval_stop  = pre_evaluate_tree<std::double_t>(*stop);
 
                 //Same here
                 start = create_value_node(EVAL_FLOAT, std::to_string(eval_start));
                 stop  = create_value_node(EVAL_FLOAT, std::to_string(eval_stop));
 
                 //Calculate the distance between two values
-                float diff = std::abs(eval_stop - eval_start);
+                std::double_t diff = std::abs(eval_stop - eval_start);
 
                 //Yeah idk what all this does from here but uhh yeah this decently works
                 int order = std::floor(std::log10(diff));
 
-                float interval = 10.0f * std::pow(10, order-1);
+                std::double_t interval = 10.0f * std::pow(10, order-1);
 
                 step = std::move(create_value_node(EVAL_FLOAT, std::to_string(eval_start < eval_stop ? interval : -interval)));
             }
@@ -670,7 +677,7 @@ ASTPtr Parser::parse_expr()
         }
     }
     
-    auto expr = common_binary_op(std::bind(parse_comp_expr, this), TOKEN_AND, TOKEN_OR, std::bind(parse_comp_expr, this));
+    auto expr = common_binary_op(std::bind(parse_comp_expr, this), TOKEN_AND, TOKEN_OR);
     
     //we can now check for Ternary operation, if we have a '?' token
     if(match_types(TOKEN_QUESTION))
@@ -695,7 +702,7 @@ ASTPtr Parser::parse_expr()
     return expr;
 }
 
-//! expression or arith_expr 
+//'!' | 'is' or arith_expr 
 ASTPtr Parser::parse_comp_expr()
 {
     //For ! expr
@@ -711,7 +718,17 @@ ASTPtr Parser::parse_comp_expr()
     }
     //For the other stuff, they all have same precedance so just pass them all in common binary op
     ///Note: Mask (comparisionTypeMask) already exists in ast.hpp
-    return common_binary_op(std::bind(parse_arith_expr, this), comparisionTypeMask, std::bind(parse_arith_expr, this));
+    auto compExpr = common_binary_op(std::bind(parse_arith_expr, this), comparisionTypeMask);
+
+    //Expr is Type
+    if(match_types(TOKEN_KEYWORD_IS))
+    {
+        advance();
+        auto type = parse_type();
+        return create_binary_op_node(TOKEN_KEYWORD_IS, std::move(compExpr), create_value_node(type, std::to_string(type)));
+    }
+
+    return compExpr;
 }
 
 //Plus/Minus operation
@@ -754,6 +771,7 @@ ASTPtr Parser::parse_power()
     return common_binary_op(std::bind(&parse_call, this), TOKEN_POW, TOKEN_POW, std::bind(&parse_unary, this));
 }
 
+//Function call or simply return atom
 ASTPtr Parser::parse_call()
 {
     auto atom = parse_atom();
@@ -964,6 +982,7 @@ ASTRawPtr Parser::get_expr_from_symbol_table(const std::string& id)
         }
     }
     //This can't/shouldn't really fail, as this is used after creation of tree
+    printError("SymbolTableError", "Error getting 'expr' from symbol table");
 }
 
 bool Parser::find_variable_from_current_scope(const std::string& identifier)
@@ -989,23 +1008,23 @@ void Parser::destroy_scope()
 template<typename RV>
 constexpr RV Parser::pre_evaluate_tree(const ASTNode& node) {
     //Dispatch based on node type
-    switch (node.getType())
+    switch (node.getTag())
     {
-        case CTType::Value:
+        case ASTTag::Value:
         {
             const auto& value_node = static_cast<const ASTValue&>(node);
 
             switch (value_node.type)
             {
                 case EVAL_INT:
-                    return std::stoi(value_node.value);
+                    return std::stoll(value_node.value);
                 case EVAL_FLOAT:
-                    return std::stof(value_node.value);
+                    return std::stod(value_node.value);
                 default:
                     printError("ParserError -> CompileTimeEvaluationError", "Invalid Evaluated type found for ValueNode");
             }
         }
-        case CTType::Binary:
+        case ASTTag::Binary:
         {
             const auto& binary_op_node = static_cast<const ASTBinaryOp&>(node);
             
@@ -1027,7 +1046,7 @@ constexpr RV Parser::pre_evaluate_tree(const ASTNode& node) {
                     else
                         return left / right;
                 case TOKEN_MODULO:
-                    if constexpr(std::is_same_v<RV, int>)
+                    if constexpr(std::is_same_v<RV, std::int64_t>)
                         return left % right;
                     else
                         return std::fmod(left, right);
@@ -1038,7 +1057,7 @@ constexpr RV Parser::pre_evaluate_tree(const ASTNode& node) {
                     printError("ParserError -> CompileTimeEvaluationError", "Unknown instruction found while pre-evaluating Binary expression");
             }
         }
-        case CTType::Unary:
+        case ASTTag::Unary:
         {
             const auto& unary_op_node = static_cast<const ASTUnaryOp&>(node);
             
@@ -1054,7 +1073,7 @@ constexpr RV Parser::pre_evaluate_tree(const ASTNode& node) {
                     printError("ParserError -> CompileTimeEvaluationError", "Unknown instruction found while pre-evaluating Unary expression");
             }
         }
-        case CTType::Cast:
+        case ASTTag::Cast:
         {
             const auto& cast_node = static_cast<const ASTCastNode&>(node);
 
@@ -1063,19 +1082,20 @@ constexpr RV Parser::pre_evaluate_tree(const ASTNode& node) {
             switch (cast_node.eval_type)
             {
                 case EVAL_INT:
-                    return static_cast<int>(expr);
+                    return static_cast<std::int64_t>(expr);
                 case EVAL_FLOAT:
-                    return static_cast<float>(expr);
+                    return static_cast<std::double_t>(expr);
                 default:
                     printError("ParserError -> CompileTimeEvaluationError", "Wrong casting type found while pre-evaluating Cast<>");
             }
         }
-        case CTType::VarAccess:
+        case ASTTag::VarAccess:
         {
             const auto& var_access_node = static_cast<const ASTVariableAccess&>(node);
 
-            //Retrieve the value of variable and recursively evaluate it (the tree)
-            return pre_evaluate_tree<RV>(*get_expr_from_symbol_table(var_access_node.identifier));
+            //Temporary solution for now
+            auto expr = get_expr_from_symbol_table(var_access_node.identifier);
+            return pre_evaluate_tree<RV>(*expr);
         }
         default:
             //Had an idea, if we cant pre evaluate it, EXCEPTION

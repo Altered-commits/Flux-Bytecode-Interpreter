@@ -98,8 +98,8 @@ void ByteCodeInterpreter::handleCasting(ILInstruction inst)
     std::visit([&inst](auto&& arg){
         globalStack.pop_back();
 
-        inst == CAST_INT ? globalStack.emplace_back(static_cast<int>(arg))
-                         : globalStack.emplace_back(static_cast<float>(arg));
+        inst == CAST_INT ? globalStack.emplace_back(static_cast<std::int64_t>(arg))
+                         : globalStack.emplace_back(static_cast<std::double_t>(arg));
     }, globalStack.back());
 }
 
@@ -145,12 +145,8 @@ void ByteCodeInterpreter::handleJump(std::size_t jumpOffset)
     globalInstructionIndex = jumpOffset - 1;
 }
 
-void ByteCodeInterpreter::handleIteratorInit(std::uint16_t iterParams)
+void ByteCodeInterpreter::handleIteratorInit(const std::string& iterId, std::uint16_t iterParams)
 {
-    //Get identifier from previous instruction
-    //PreInit consists of the identifier
-    std::string iterId = std::get<std::string>(instructions[globalInstructionIndex - 1].value);
-
     //iterParams -> Iterator Type << 8 | Identifier Type
     //Higher 8bits are Iterator Type
     std::uint8_t iterType  = (iterParams & 0xFF00) >> 8;
@@ -162,13 +158,13 @@ void ByteCodeInterpreter::handleIteratorInit(std::uint16_t iterParams)
     {
         case EVAL_INT:
             globalIteratorStack.emplace_back(
-                getIterator<int>(iterId, (IteratorType)iterType)
+                getIterator<std::int64_t>(iterId, (IteratorType)iterType)
             );
             break;
 
         case EVAL_FLOAT:
             globalIteratorStack.emplace_back(
-                getIterator<float>(iterId, (IteratorType)iterType)
+                getIterator<std::double_t>(iterId, (IteratorType)iterType)
             );
             break;
     }
@@ -291,14 +287,14 @@ void ByteCodeInterpreter::decodeFile()
             break;
 
             //Primitive types
-            case PUSH_INT32:
-                refToInstructionList->emplace_back(inst, readOperand<std::int32_t>(chunkBuffer, chunkBufferIndex));
+            case PUSH_INT64:
+                refToInstructionList->emplace_back(inst, readOperand<std::int64_t>(chunkBuffer, chunkBufferIndex));
                 break;
             case PUSH_UINT64:
                 refToInstructionList->emplace_back(inst, readOperand<std::uint64_t>(chunkBuffer, chunkBufferIndex));
                 break;
             case PUSH_FLOAT:
-                refToInstructionList->emplace_back(inst, readOperand<float>(chunkBuffer, chunkBufferIndex));
+                refToInstructionList->emplace_back(inst, readOperand<std::double_t>(chunkBuffer, chunkBufferIndex));
                 break;
 
             //Variable assignment / accessing
@@ -351,7 +347,7 @@ void ByteCodeInterpreter::decodeFile()
 void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstructions)
 {
     if(currentRecursionDepth > maxRecursionDepth)
-        printRuntimeError("RecursionError", "Max recursion depth reached, over 10,000 function calls");
+        printRuntimeError("RecursionError", "Max recursion depth reached, over 1000 function calls");
 
     while(true)
     {
@@ -359,7 +355,7 @@ void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstr
 
         switch (i.inst)
         {
-            case ILInstruction::PUSH_INT32:
+            case ILInstruction::PUSH_INT64:
             case ILInstruction::PUSH_UINT64:
             case ILInstruction::PUSH_FLOAT:
                 pushInstructionValue(i.value);
@@ -393,6 +389,7 @@ void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstr
             case ILInstruction::CMP_GT:
             case ILInstruction::CMP_LTEQ:
             case ILInstruction::CMP_GTEQ:
+            case ILInstruction::CMP_IS:
             //Logical Operations
             case ILInstruction::AND:
             case ILInstruction::OR:
@@ -423,7 +420,8 @@ void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstr
             
             //Iterators
             case ILInstruction::ITER_INIT:
-                handleIteratorInit(std::get<std::uint16_t>(i.value));
+                handleIteratorInit(std::get<std::string>(externalInstructions[globalInstructionIndex - 1].value),
+                                    std::get<std::uint16_t>(i.value));
                 break;
             case ILInstruction::ITER_HAS_NEXT:
                 handleIteratorHasNext(std::get<std::size_t>(i.value));
@@ -509,9 +507,9 @@ void ByteCodeInterpreter::interpret()
     auto end_ii = std::chrono::high_resolution_clock::now();
 
     std::cout << "Time to decode entire file: " <<
-        (std::chrono::duration_cast<std::chrono::microseconds>(end_df - start_df)).count() << "ms" << '\n';
+        (std::chrono::duration_cast<std::chrono::microseconds>(end_df - start_df)).count() << "microsec" << '\n';
     std::cout << "Time to interpret decoded instructions: " <<
-        (std::chrono::duration_cast<std::chrono::microseconds>(end_ii - start_ii)).count() << "ms" << '\n';
+        (std::chrono::duration_cast<std::chrono::microseconds>(end_ii - start_ii)).count() << "microsec" << '\n';
 }
 
 //-----------------Helper Fuctions-----------------
@@ -565,6 +563,23 @@ void ByteCodeInterpreter::compare(const T& arg1, const U& arg2, ILInstruction in
         case ILInstruction::CMP_GTEQ:
             result = (arg1 >= arg2);
             break;
+        //Type comparison (is operator)
+        case ILInstruction::CMP_IS:
+            switch (static_cast<std::uint8_t>(arg2))
+            {
+                case EVAL_VOID:
+                    result = 0; //Void doesn't exist in variable declaration so using 'is' for Void type is always false
+                    break;
+                case EVAL_INT:
+                    result = std::is_same<T, std::int64_t>::value;
+                    break;
+                case EVAL_FLOAT:
+                    result = std::is_same<T, std::double_t>::value;
+                    break;
+                default:
+                    printRuntimeError("ComparisionError", "Unknown type found for 'is' operator");
+            }
+            break;
         //Logical operations
         case ILInstruction::AND:
             result = (arg1 && arg2);
@@ -585,9 +600,9 @@ void ByteCodeInterpreter::pushInstructionValue(const InstructionValue& val)
     std::visit([&](auto&& arg){
         using T = std::decay_t<decltype(arg)>;
 
-        if constexpr(std::is_same_v<T, std::int32_t>
+        if constexpr(std::is_same_v<T, std::int64_t>
                     || std::is_same_v<T, std::uint64_t>
-                    || std::is_same_v<T, float>)
+                    || std::is_same_v<T, std::double_t>)
             globalStack.emplace_back(std::move(arg));
     }, val);
 }

@@ -16,14 +16,14 @@ void FileWriter::writeToFile(const ListOfInstruction &commands)
             //Write operand to file second, depending on what instruction, cast string operand to specific type
             switch (cmd.inst)
             {
-                case PUSH_INT32:
-                    outFile.write(reinterpret_cast<const Byte*>(&std::get<std::int32_t>(cmd.value)), sizeof(std::int32_t));
+                case PUSH_INT64:
+                    outFile.write(reinterpret_cast<const Byte*>(&std::get<std::int64_t>(cmd.value)), sizeof(std::int64_t));
                     break;
                 case PUSH_UINT64:
-                    outFile.write(reinterpret_cast<const Byte*>(&std::get<std::size_t>(cmd.value)), sizeof(std::size_t));
+                    outFile.write(reinterpret_cast<const Byte*>(&std::get<std::uint64_t>(cmd.value)), sizeof(std::uint64_t));
                     break;
                 case PUSH_FLOAT:
-                    outFile.write(reinterpret_cast<const Byte*>(&std::get<float>(cmd.value)), sizeof(float));
+                    outFile.write(reinterpret_cast<const Byte*>(&std::get<std::double_t>(cmd.value)), sizeof(std::double_t));
                     break;
 
                 case ACCESS_VAR:

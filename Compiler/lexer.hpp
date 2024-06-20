@@ -69,6 +69,7 @@ class Lexer
             {"Else", TOKEN_KEYWORD_ELSE},
             {"For", TOKEN_KEYWORD_FOR},
             {"in", TOKEN_KEYWORD_IN},
+            {"is", TOKEN_KEYWORD_IS},
             {"While", TOKEN_KEYWORD_WHILE},
             {"Func", TOKEN_KEYWORD_FUNC},
             {"Continue", TOKEN_KEYWORD_CONTINUE},

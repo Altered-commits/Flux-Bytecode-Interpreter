@@ -56,7 +56,7 @@ int main(int argc, char** argv)
 
     //----------------COMPILATION END----------------
     auto end = std::chrono::high_resolution_clock::now();
-
+    
     //Write to file
     FileWriter fw{"Gen.cflx"};
     fw.writeToFile(generatedBytecode);

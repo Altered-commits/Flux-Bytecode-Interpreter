@@ -27,7 +27,7 @@
                     il_code.emplace_back(ILInstruction::DESTROY_SYMBOL_TABLE);\
                     INC_CURRENT_OFFSET
 
-#define IL_LOOP_START cb_info.emplace_back(il_code.size(), std::vector<size_t>{});
+#define IL_LOOP_START cb_info.emplace_back(GET_CURRENT_OFFSET, std::vector<size_t>{});
 #define IL_LOOP_END   cb_info.pop_back();
 
 #define IL_FUNC_START return_addr.emplace_back(ListOfSizeT{});

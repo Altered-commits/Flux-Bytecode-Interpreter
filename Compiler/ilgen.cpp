@@ -18,7 +18,7 @@ void ILGenerator::handleReturnIfExists(std::size_t func_end_offset)
 
     for (auto&& i : return_addr.back())
     {
-        int val = std::get<int>(il_code[i].value);
+        std::int64_t val = std::get<std::int64_t>(il_code[i].value);
 
         //If we can return, set the top most bit 
         //Assumption that the offset will never give a number so big it spans all the bits of 64bit number
@@ -45,16 +45,16 @@ ListOfInstruction& ILGenerator::generateIL()
 
 void ILGenerator::visit(ASTValue& value_node, bool)
 {
-    // For constant values, push them onto the stack
+    //For constant values, push them onto the stack
     switch (value_node.type)
     {
         case EVAL_INT:
-            std::cout << "PUSH_INT32 ";
-            il_code.emplace_back(ILInstruction::PUSH_INT32, std::stoi(value_node.value));
+            std::cout << "PUSH_INT64 ";
+            il_code.emplace_back(ILInstruction::PUSH_INT64, std::stoll(value_node.value));
             break;
         case EVAL_FLOAT:
             std::cout << "PUSH_FLOAT ";
-            il_code.emplace_back(ILInstruction::PUSH_FLOAT, std::stof(value_node.value));
+            il_code.emplace_back(ILInstruction::PUSH_FLOAT, std::stod(value_node.value));
             break;
         default:
             printError("ASTValue type not supported", value_node.type);
@@ -120,6 +120,10 @@ void ILGenerator::visit(ASTBinaryOp& binary_op_node, bool)
         case TOKEN_LTEQ:
             std::cout << "CMP_LTEQ\n";
             instruction = ILInstruction::CMP_LTEQ;
+            break;
+        case TOKEN_KEYWORD_IS:
+            std::cout << "CMP_IS\n";
+            instruction = ILInstruction::CMP_IS;
             break;
         case TOKEN_AND:
             std::cout << "AND\n";
@@ -320,7 +324,7 @@ void ILGenerator::visit(ASTIfNode& if_node, bool is_sub_expr)
         //Store values in vector
         il_code.emplace_back(ILInstruction::JUMP);
         INC_CURRENT_OFFSET
-        elif_jump_locations.push_back(GET_CURRENT_OFFSET - 1);
+        elif_jump_locations.push_back(il_code.size() - 1);
 
         std::cout << "JUMP (Elif)\n";
 
@@ -358,7 +362,8 @@ void ILGenerator::visit(ASTForNode& for_node, bool is_sub_expr)
     il_code.emplace_back(ILInstruction::ITER_HAS_NEXT);
     INC_CURRENT_OFFSET
     
-    std::size_t iter_has_next_location = GET_CURRENT_OFFSET - 1;
+    std::size_t iter_has_next_location = il_code.size() - 1;
+    std::size_t iter_has_next_offset   = GET_CURRENT_OFFSET - 1;
 
     //Assign the start value to the identifier using some weird instructions
     std::cout << "ITER_CURRENT\n";
@@ -369,8 +374,8 @@ void ILGenerator::visit(ASTForNode& for_node, bool is_sub_expr)
     for_node.for_body->accept(*this, is_sub_expr);
     
     //Go past the current value and loop again
-    std::cout << "ITER_NEXT " << iter_has_next_location << '\n';
-    il_code.emplace_back(ILInstruction::ITER_NEXT, iter_has_next_location);
+    std::cout << "ITER_NEXT " << iter_has_next_offset << '\n';
+    il_code.emplace_back(ILInstruction::ITER_NEXT, iter_has_next_offset);
     INC_CURRENT_OFFSET
 
     //After this location is where its going to jump if condition is false
@@ -434,8 +439,8 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
     //But what i was thinking was, lets just give emplace a dummy value so its satisfied
     //After initializing Iterator, emplace the ITER_RECALC_STEP instruction
     else {
-        std::cout << "PUSH_INT32 0\n";
-        il_code.emplace_back(ILInstruction::PUSH_INT32, 0);
+        std::cout << "PUSH_INT64 0\n";
+        il_code.emplace_back(ILInstruction::PUSH_INT64, 0);
         INC_CURRENT_OFFSET
     }
 

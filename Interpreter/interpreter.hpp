@@ -18,7 +18,7 @@
 #include "..\Common\error_printer.hpp"
 
 using Byte   = char;
-using Object = std::variant<std::uint64_t, std::int32_t, std::uint32_t, float, double>; //Had no other name
+using Object = std::variant<std::uint64_t, std::int64_t, std::double_t>; //Had no other name
 using FunctionTable = std::unordered_map<std::size_t, ListOfInstruction>;
 
 #include "iterators.hpp"
@@ -64,7 +64,7 @@ class ByteCodeInterpreter {
         void handleJumpIfFalse(std::size_t);
         void handleJump(std::size_t);
         //Iterator
-        void handleIteratorInit(std::uint16_t);
+        void handleIteratorInit(const std::string&, std::uint16_t);
         void handleIteratorHasNext(std::size_t);
         void handleIteratorNext(std::size_t);
         //Function and Return
@@ -103,7 +103,7 @@ class ByteCodeInterpreter {
         //Function stuff
         FunctionTable     functionTable;
         bool              isFunctionOngoing = false;
-        std::uint32_t     maxRecursionDepth = 10000, currentRecursionDepth = 0;
+        std::uint32_t     maxRecursionDepth = 1000, currentRecursionDepth = 0;
         std::vector<std::uint16_t> functionStartingScope;
 };
 #endif

@@ -38,14 +38,15 @@ constexpr std::size_t termExprTypeMask = (1ULL << static_cast<std::size_t>(TOKEN
 //Used for comparing token type in a type mask
 #define SAME_PRECEDENCE_MASK_CHECK(token, mask) (((1ULL << static_cast<std::size_t>(token)) & mask))
 
-//Some enums for Compile time evaluation
-enum class CTType {
+//Some enums for Compile time evaluation / necessary tags used in Compiler
+enum class ASTTag {
     NA,
     Value,
     Binary,
     Unary,
+    VarAccess,
     Cast,
-    VarAccess
+    Dummy
 };
 
 //For the visitor pattern, we need to forward declare all the ast nodes
@@ -105,7 +106,7 @@ struct ASTNode
     virtual bool isCallable() const { return false; }
 
     //Think of it as a tag for each type
-    virtual CTType getType() const { return CTType::NA; }
+    virtual ASTTag getTag() const { return ASTTag::NA; }
 
     //Expression evaluation for final type (variables and range)
     virtual EvalType evaluateExprType() const { return EVAL_UNKNOWN; }
@@ -131,8 +132,8 @@ struct ASTValue : public ASTNode
     }
 
     //Tag
-    CTType getType() const override {
-        return CTType::Value;
+    ASTTag getTag() const override {
+        return ASTTag::Value;
     }
 };
 
@@ -161,8 +162,8 @@ struct ASTBinaryOp : public ASTNode
     }
 
     //Tag
-    CTType getType() const override {
-        return CTType::Binary;
+    ASTTag getTag() const override {
+        return ASTTag::Binary;
     }
 };
 
@@ -190,8 +191,8 @@ struct ASTUnaryOp : public ASTNode
     }
 
     //Tag
-    CTType getType() const override {
-        return CTType::Unary;
+    ASTTag getTag() const override {
+        return ASTTag::Unary;
     }
 };
 
@@ -241,8 +242,8 @@ struct ASTVariableAccess : public ASTNode
     }
 
     //Tag
-    CTType getType() const override {
-        return CTType::VarAccess;
+    ASTTag getTag() const override {
+        return ASTTag::VarAccess;
     }
 };
 
@@ -264,8 +265,8 @@ struct ASTCastNode : public ASTNode
     }
 
     //Tag
-    CTType getType() const override {
-        return CTType::Cast;
+    ASTTag getTag() const override {
+        return ASTTag::Cast;
     }
 };
 
@@ -506,6 +507,11 @@ struct ASTDummyNode : public ASTNode
 
     EvalType evaluateExprType() const override {
         return type;
+    }
+
+    //Tag
+    ASTTag getTag() const override {
+        return ASTTag::Dummy;
     }
 };
 #endif
