@@ -130,6 +130,7 @@ class Parser
 
         //Token type to Eval type converter
         const std::unordered_map<TokenType, EvalType> token_to_eval_type = {
+            {TOKEN_KEYWORD_ANY,   EVAL_ANY},
             {TOKEN_KEYWORD_VOID,  EVAL_VOID},
             {TOKEN_INT,           EVAL_INT},
             {TOKEN_KEYWORD_INT,   EVAL_INT},

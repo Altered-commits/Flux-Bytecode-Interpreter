@@ -60,21 +60,22 @@ class Lexer
     private:
         //For Differentiation of keyword and identifier
         const std::unordered_map<std::string, TokenType> identifier_map = {
-            {"Void", TOKEN_KEYWORD_VOID},
-            {"Int", TOKEN_KEYWORD_INT},
-            {"Float", TOKEN_KEYWORD_FLOAT},
-            {"Cast", TOKEN_KEYWORD_CAST},
-            {"If", TOKEN_KEYWORD_IF},
-            {"Elif", TOKEN_KEYWORD_ELIF},
-            {"Else", TOKEN_KEYWORD_ELSE},
-            {"For", TOKEN_KEYWORD_FOR},
-            {"in", TOKEN_KEYWORD_IN},
-            {"is", TOKEN_KEYWORD_IS},
-            {"While", TOKEN_KEYWORD_WHILE},
-            {"Func", TOKEN_KEYWORD_FUNC},
+            {"Any",      TOKEN_KEYWORD_ANY},
+            {"Void",     TOKEN_KEYWORD_VOID},
+            {"Int",      TOKEN_KEYWORD_INT},
+            {"Float",    TOKEN_KEYWORD_FLOAT},
+            {"Cast",     TOKEN_KEYWORD_CAST},
+            {"If",       TOKEN_KEYWORD_IF},
+            {"Elif",     TOKEN_KEYWORD_ELIF},
+            {"Else",     TOKEN_KEYWORD_ELSE},
+            {"For",      TOKEN_KEYWORD_FOR},
+            {"in",       TOKEN_KEYWORD_IN},
+            {"is",       TOKEN_KEYWORD_IS},
+            {"While",    TOKEN_KEYWORD_WHILE},
+            {"Func",     TOKEN_KEYWORD_FUNC},
             {"Continue", TOKEN_KEYWORD_CONTINUE},
-            {"Break", TOKEN_KEYWORD_BREAK},
-            {"Return", TOKEN_KEYWORD_RETURN},
+            {"Break",    TOKEN_KEYWORD_BREAK},
+            {"Return",   TOKEN_KEYWORD_RETURN},
         };
 
 };

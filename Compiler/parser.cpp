@@ -172,7 +172,7 @@ ASTPtr Parser::parse_if_condition()
 
     //Now we need ')'
     if(!match_types(TOKEN_RPAREN))
-        printError("ParserError", "Expected ')' after condition for If clause");
+        printError("ParserError", "Expected closing ')' for If clause");
     advance();
 
     //Look for '{' body '}'
@@ -189,7 +189,7 @@ ASTPtr Parser::parse_if_condition()
         
         auto elif_condition = parse_expr();
         
-        if(!match_types(TOKEN_RPAREN)) printError("ParserError", "Expected ')' for Elif clause after condition");
+        if(!match_types(TOKEN_RPAREN)) printError("ParserError", "Expected closing ')' for Elif clause after condition");
         advance();
 
         //'{' body '}'
@@ -404,11 +404,11 @@ ASTPtr Parser::parse_reassignment(EvalType var_type, std::uint16_t scope_index)
     auto var_expr  = parse_expr();
     auto expr_type = var_expr->evaluateExprType();
 
-    if(var_type == expr_type)
+    if(var_type == expr_type || var_type == EVAL_ANY)
     {
         //Add it to symbol table and create AST
-        set_value_to_nth_frame(identifier, var_expr, var_type);
-        return create_variable_assign_node(var_type, identifier, std::move(var_expr), true, scope_index);
+        set_value_to_nth_frame(identifier, var_expr, expr_type);
+        return create_variable_assign_node(expr_type, identifier, std::move(var_expr), true, scope_index);
     }
     //Oops, types dont match, errrorrrrr!
     printError("ParserError", "Evaluated expression type doesn't match the type pre-assigned to variable: ", identifier);
@@ -452,11 +452,11 @@ ASTPtr Parser::parse_declaration(EvalType var_type, std::uint16_t scope_index)
             auto var_expr  = parse_expr();
             auto expr_type = var_expr->evaluateExprType();
 
-            if(var_type == expr_type)
+            if(var_type == expr_type || var_type == EVAL_ANY)
             {
                 //Add it to symbol table and create AST
-                set_value_to_top_frame(identifier, var_expr, var_type);
-                declarations.emplace_back(create_variable_assign_node(var_type, identifier, std::move(var_expr), false, scope_index));
+                set_value_to_top_frame(identifier, var_expr, expr_type);
+                declarations.emplace_back(create_variable_assign_node(expr_type, identifier, std::move(var_expr), false, scope_index));
             }
             else
                 //Oops, types dont match, errrorrrrr!
@@ -545,6 +545,7 @@ ASTPtr Parser::parse_statement()
     {
         case TOKEN_KEYWORD_FLOAT:
         case TOKEN_KEYWORD_INT:
+        case TOKEN_KEYWORD_ANY:
         {
             EvalType var_type = token_to_eval_type.at(current_token.token_type);
             advance();
@@ -678,7 +679,7 @@ ASTPtr Parser::parse_expr()
     }
     
     auto expr = common_binary_op(std::bind(parse_comp_expr, this), TOKEN_AND, TOKEN_OR);
-    
+
     //we can now check for Ternary operation, if we have a '?' token
     if(match_types(TOKEN_QUESTION))
     {

@@ -507,9 +507,9 @@ void ByteCodeInterpreter::interpret()
     auto end_ii = std::chrono::high_resolution_clock::now();
 
     std::cout << "Time to decode entire file: " <<
-        (std::chrono::duration_cast<std::chrono::microseconds>(end_df - start_df)).count() << "microsec" << '\n';
+        (std::chrono::duration_cast<std::chrono::microseconds>(end_df - start_df)).count() << " microsec" << '\n';
     std::cout << "Time to interpret decoded instructions: " <<
-        (std::chrono::duration_cast<std::chrono::microseconds>(end_ii - start_ii)).count() << "microsec" << '\n';
+        (std::chrono::duration_cast<std::chrono::microseconds>(end_ii - start_ii)).count() <<  "microsec" << '\n';
 }
 
 //-----------------Helper Fuctions-----------------

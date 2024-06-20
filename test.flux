@@ -31,7 +31,9 @@ Func<Int> doFunc(Int a, Int b)
     Return -10;
 }
 
-If (doFunc(0, 4) is Int) {
+Any res = doFunc(0, 4);
+
+If (res is Int && res == -10) {
     j = 1;
 }
 

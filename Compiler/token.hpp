@@ -38,6 +38,7 @@ enum TokenType : std::uint8_t {
     TOKEN_OR,
     //Keyword and Identifier Types
     TOKEN_ID,
+    TOKEN_KEYWORD_ANY,
     TOKEN_KEYWORD_VOID,
     TOKEN_KEYWORD_INT,
     TOKEN_KEYWORD_FLOAT,
