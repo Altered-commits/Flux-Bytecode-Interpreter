@@ -54,6 +54,7 @@ class ILGenerator : public ASTVisitorInterface {
         void visit(ASTCastNode&, bool);
         void visit(ASTBlock&, bool);
         void visit(ASTRangeIterator&, bool);
+        void visit(ASTEllipsisIterator&, bool);
         void visit(ASTTernaryOp&, bool);
         void visit(ASTIfNode&, bool);
         void visit(ASTForNode&, bool);

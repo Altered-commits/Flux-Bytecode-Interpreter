@@ -67,6 +67,7 @@ class Parser
         ASTPtr parse_while_loop();
         ASTPtr parse_iterator(const std::string&);
         ASTPtr parse_range_iterator(const std::string&, bool);
+        ASTPtr parse_ellipsis_iterator(const std::string&);
         ASTPtr parse_block();
         ASTPtr parse_cast();
         ASTPtr parse_variable(EvalType, bool, std::uint16_t);
@@ -86,9 +87,10 @@ class Parser
         ASTPtr create_ternary_op_node(ASTPtr&&, ASTPtr&&, ASTPtr&&);
         ASTPtr create_if_node(ASTPtr&&, ASTPtr&&, std::vector<std::pair<ASTPtr, ASTPtr>>&&, ASTPtr&&);
         ASTPtr create_range_iter_node(ASTPtr&&, ASTPtr&&, ASTPtr&&, const std::string&, bool);
+        ASTPtr create_ellipsis_iter_node(EvalType, const std::string&);
         ASTPtr create_for_node(const std::string&, ASTPtr&&, ASTPtr&&);
         ASTPtr create_while_node(ASTPtr&&, ASTPtr&&);
-        ASTPtr create_func_decl_node(EvalType, const std::string&, FuncParams&&, ASTPtr&&);
+        ASTPtr create_func_decl_node(EvalType, const std::string&, FuncParams&&, ASTPtr&&, bool, EvalType);
         ASTPtr create_func_call_node(FuncArgs&&, ASTFunctionDecl*);
         ASTPtr create_continue_node(std::uint8_t, std::uint16_t);
         ASTPtr create_break_node(std::uint8_t, std::uint16_t);

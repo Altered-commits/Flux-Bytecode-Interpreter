@@ -1,4 +1,4 @@
-include Flux.Common.flux
+include Flux.Common
 
 //Common defines found in math libraries
 define M_E        2.718281828459045

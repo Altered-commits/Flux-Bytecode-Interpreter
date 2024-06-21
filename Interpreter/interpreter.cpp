@@ -156,6 +156,8 @@ void ByteCodeInterpreter::handleIteratorInit(const std::string& iterId, std::uin
     //Get iterator of that type
     switch ((EvalType)identType)
     {
+        //Doesn't matter, Auto type is emitted only in Ellipsis Iterator, hence it's of no use. Templates dont matter
+        case EVAL_AUTO:
         case EVAL_INT:
             globalIteratorStack.emplace_back(
                 getIterator<std::int64_t>(iterId, (IteratorType)iterType)
@@ -213,6 +215,13 @@ void ByteCodeInterpreter::handleFunctionEnd()
 {
     //Destroy function scope and set globalInstructionIndex to what it was before function call
     destroyFunctionScope();
+    
+    //If we use vargs, clean up them as well till return address
+    if(!functionStartingStack.empty())
+    {
+        globalStack.resize(functionStartingStack.back());
+        functionStartingStack.pop_back();
+    }
 
     auto val = std::get<std::uint64_t>(globalStack.back());
     globalInstructionIndex = val - 1;
@@ -320,6 +329,7 @@ void ByteCodeInterpreter::decodeFile()
             case ILInstruction::ITER_HAS_NEXT:
             case ILInstruction::ITER_NEXT:
             case ILInstruction::FUNC_CALL:
+            case ILInstruction::FUNC_VARGS:
             case ILInstruction::RETURN:
                 refToInstructionList->emplace_back(inst, readOperand<std::size_t>(chunkBuffer, chunkBufferIndex));
                 break;
@@ -448,6 +458,13 @@ void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstr
                 break;
             
             //Functions and return values
+            //Save current stack size and push vargs size as well
+            case ILInstruction::FUNC_VARGS:
+            {
+                functionStartingStack.emplace_back(globalStack.size());
+                globalStack.emplace_back(std::get<std::size_t>(i.value));
+            }
+            break;
             //Return address is already saved to stack, call function resetting instruction index to 0
             case ILInstruction::FUNC_CALL:
             {
@@ -528,10 +545,18 @@ IterPtr ByteCodeInterpreter::getIterator(const std::string& id, IteratorType ite
             
             globalStack.resize(globalStack.size() - 3);
             
-            return std::visit([&](auto&& step, auto&& stop, auto&& start){
-                //Create the iterator and return it
+            return std::visit([&](auto&& step, auto&& stop, auto&& start) {
                 return std::make_unique<RangeIterator<T>>(id, start, stop, step);
             }, vstep, vstop, vstart);
+        }
+        break;
+        case ELLIPSIS_ITERATOR:
+        {
+            auto start = functionStartingStack.back();
+            //We need to get the size of vargs, which is exactly after top function ret addr
+            return std::visit([&](auto&& size) {
+                return std::make_unique<EllipsisIterator>(id, start + 1, size);
+            }, globalStack[start]);
         }
         break;
         default:

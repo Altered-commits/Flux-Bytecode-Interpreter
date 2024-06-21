@@ -1,14 +1,16 @@
-include Flux.Common.flux
-include Flux.Math.flux
+Func<Auto> Summation(Auto ...)
+{
+    Auto result;
+    For i in ... {
+        If (i is Int) {
+            result = result + i;
+        }
+        Elif (i is Float) {
+            result = result + i + 0.5;
+        }
+    }
 
-Int j = -1;
-
-Auto a, b;
-
-a = 1.042;
-
-If (a is Float && b is Int) {
-    j = 1;
+    Return result;
 }
 
-j;
+Summation(1, 2.5, 3, 4.5, 5, 6.5, 7, 8.5) + 0;

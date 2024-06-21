@@ -39,10 +39,16 @@ void FileWriter::writeToFile(const ListOfInstruction &commands)
                 case DATAINST_VAR_SCOPE_IDX:
                 //Same logic for these instructions as well
                 case DESTROY_MULTIPLE_SYMBOL_TABLES:
-                case ITER_INIT:
                 {
                     //16bit uint value
                     std::uint16_t params16Bit = cmd.scopeIndexIfNeeded;
+                    outFile.write(reinterpret_cast<Byte*>(&params16Bit), sizeof(std::uint16_t));
+                }
+                break;
+                case ITER_INIT:
+                {
+                    //Difference being, this uses .value instead of .scopeIndexIfNeeded
+                    std::uint16_t params16Bit = std::get<std::uint16_t>(cmd.value);
                     outFile.write(reinterpret_cast<Byte*>(&params16Bit), sizeof(std::uint16_t));
                 }
                 break;
@@ -54,6 +60,7 @@ void FileWriter::writeToFile(const ListOfInstruction &commands)
                 case ITER_NEXT:
                 case FUNC_START:
                 case FUNC_CALL:
+                case FUNC_VARGS:
                 case RETURN:
                 {
                     auto offset = std::get<std::size_t>(cmd.value);

@@ -105,5 +105,6 @@ class ByteCodeInterpreter {
         bool              isFunctionOngoing = false;
         std::uint32_t     maxRecursionDepth = 1000, currentRecursionDepth = 0;
         std::vector<std::uint16_t> functionStartingScope;
+        std::vector<std::size_t>   functionStartingStack; //Might merge this and above vector in future
 };
 #endif

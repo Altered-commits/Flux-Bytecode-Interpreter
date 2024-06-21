@@ -5,6 +5,8 @@
 #include <memory>
 
 class Iterator;
+//Mark this as extern to get access to globalStack residing in interpreter.cpp
+extern std::vector<Object> globalStack;
 
 using IterPtr = std::unique_ptr<Iterator>;
 
@@ -54,6 +56,39 @@ class RangeIterator : public Iterator
 
     private:
         T start, stop, step;
+};
+
+//Reverse iteration, going from start to end is reverse apparently and idk how that happened, so we go from end to start
+class EllipsisIterator : public Iterator
+{
+public:
+    EllipsisIterator(const std::string& iterId, std::size_t start, std::size_t size)
+        : start(start), end(start + size - 1)
+    {
+        iterIdentifier = std::move(iterId);
+    }
+
+    Object getCurrent() const override {
+        return globalStack[end];
+    }
+
+    const std::string& getId() const override {
+        return iterIdentifier;
+    }
+
+    //No need for this
+    void recalcStep() override {}
+
+    void next() override {
+        end -= 1;
+    }
+
+    bool hasNext() const override {
+        return end >= start;
+    }
+
+private:
+    std::size_t start, end;
 };
 
 #endif

@@ -468,6 +468,23 @@ void ILGenerator::visit(ASTRangeIterator& range_iter_node, bool is_sub_expr)
     }
 }
 
+void ILGenerator::visit(ASTEllipsisIterator& ellipsis_iter_node, bool is_sub_expr)
+{
+    //Pre init aka set up identifier
+    std::cout << "DATAINST_ITER_ID " << ellipsis_iter_node.iter_identifier << '\n';
+    il_code.emplace_back(ILInstruction::DATAINST_ITER_ID, std::move(ellipsis_iter_node.iter_identifier));
+    
+    //Init vargs iter
+    std::uint16_t data = ((std::uint8_t)IteratorType::ELLIPSIS_ITERATOR << 8)
+                       | ((std::uint8_t)ellipsis_iter_node.ellipsis_type);
+
+    std::cout << "ITER_INIT " << data << '\n';
+    il_code.emplace_back(ILInstruction::ITER_INIT, data);
+
+    //Inc for both iter and datainst iter
+    INCN_CURRENT_OFFSET(2)
+}
+
 //------------FUNCTIONS------------
 void ILGenerator::visit(ASTFunctionDecl& func_decl_node, bool is_sub_expr)
 {
@@ -508,6 +525,18 @@ void ILGenerator::visit(ASTFunctionCall& func_call_node, bool is_sub_expr)
 
     std::size_t ret_addr = il_code.size() - 1;
     
+    //Push the size / len of vargs so it sits right after return address
+    if(func_call_node.initial_func->has_vargs)
+    {
+        //Take number of args and minus it with number of params, thats the amount of vargs we have rn
+        auto params_len = func_call_node.initial_func->function_params.size();
+        auto args_len   = func_call_node.function_args.size();
+
+        std::cout << "FUNC_VARGS " << args_len - params_len << '\n';
+        il_code.emplace_back(ILInstruction::FUNC_VARGS, args_len - params_len);
+        INC_CURRENT_OFFSET;
+    }
+
     //Really bad syntax but push stuff in reverse order cuz stack will pop in another other when assigning values to variables
     for(auto it = func_call_node.function_args.rbegin(); 
              it != func_call_node.function_args.rend();

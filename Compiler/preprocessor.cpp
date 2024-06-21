@@ -21,19 +21,13 @@ void Preprocessor::preprocessInternal(std::string&& sourceCode)
             //Remove whitespace
             filePath.erase(std::remove_if(filePath.begin(), filePath.end(), ::isspace), filePath.end());
 
-            if (filePath.size() < 5 || filePath.compare(filePath.size() - 5, 5, ".flux") != 0) {
-                std::cout << "PreprocessorError: Include file must have a '.flux' extension: " << filePath << '\n';
-                std::exit(1);
-            }
+            //Replace all '.' with '/'
+            std::replace(filePath.begin(), filePath.end(), '.', '/');
 
-            //Replace all '.' with '/' except for the last one
-            size_t lastDotPos = filePath.find_last_of('.');
-            for (size_t i = 0; i < lastDotPos; ++i) {
-                if (filePath[i] == '.') {
-                    filePath[i] = '/';
-                }
-            }
+            //Manually add .flux extension at the end
+            filePath.append(".flux");
 
+            //If the file already exists, ignore it
             if(preprocessedFiles.find(filePath) != preprocessedFiles.end())
                 continue;
             

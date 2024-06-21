@@ -16,6 +16,7 @@ EvalType Parser::parse_type()
     switch (current_token.token_type)
     {
         //Perfect
+        case TOKEN_KEYWORD_AUTO:
         case TOKEN_KEYWORD_VOID:
         case TOKEN_KEYWORD_INT:
         case TOKEN_KEYWORD_FLOAT:
@@ -90,10 +91,25 @@ ASTPtr Parser::parse_function_decl()
     advance();
     
     FuncParams func_params;
+    bool       has_vargs  = false;
+    EvalType   vargs_type;
 
-    while (true)
+    while (!match_types(TOKEN_RPAREN))
     {
         EvalType param_type = parse_type();
+
+        //Vargs, break out of loop
+        if(match_types(TOKEN_ELLIPSIS)) {
+            //Used to detect if func has vargs by statements in function body
+            set_value_to_top_frame(current_token.token_value, nullptr, param_type);
+
+            advance();
+
+            has_vargs = true;
+            vargs_type = param_type;
+            //Vargs must be the last parameter in function decl
+            break;
+        }
 
         if(!match_types(TOKEN_ID))
             printError("ParserError", "Expected identifier after type");
@@ -116,7 +132,7 @@ ASTPtr Parser::parse_function_decl()
     advance();
 
     //Pre set it to symbol table once to allow recursive calls to be a thing
-    auto func_node = create_func_decl_node(return_type, identifier, std::move(func_params), nullptr);
+    auto func_node = create_func_decl_node(return_type, identifier, std::move(func_params), nullptr, has_vargs, vargs_type);
     set_value_to_top_frame(identifier, func_node, EVAL_CALLABLE);
     
     SAVE_RETURN_TYPE(return_type)
@@ -138,21 +154,40 @@ ASTPtr Parser::parse_function_call(const std::string& func_name)
     ASTFunctionDecl* inital_function = static_cast<ASTFunctionDecl*>(get_expr_from_symbol_table(func_name));
     FuncArgs         func_args       = parse_list(TOKEN_LPAREN, TOKEN_RPAREN);
     FuncParams&      func_params     = inital_function->function_params;
+    bool             has_vargs       = inital_function->has_vargs;
+    EvalType         vargs_type      = inital_function->vargs_type;
 
     std::size_t args_len = func_args.size(), params_len = func_params.size();
 
+    //For vargs we just need to see if its '<' or not, no need for it to be equal
+    if(has_vargs && args_len < params_len)
+        printError("ParserError", "Function '", func_name, "' expected atleast ", params_len, " arguments but got ", args_len);
     //Check if len of function params matches len of func_args, if it doesn't, error
-    if(args_len != params_len)
+    else if(!has_vargs && args_len != params_len)
         printError("ParserError", "Function '", func_name, "' expected ", params_len, " arguments but got ", args_len);
     
     //Check datatype compatibility between args and params
-    for (std::size_t i = 0; i < args_len; ++i)
+    for (std::size_t i = 0; i < params_len; ++i)
     {
-        EvalType arg_type   = func_args[i]->evaluateExprType();
         EvalType param_type = func_params[i].first;
+        //No need to check for auto type
+        if(param_type == EVAL_AUTO)
+            continue;
+
+        EvalType arg_type = func_args[i]->evaluateExprType();
 
         if (arg_type != param_type)
             printError("ParserError", "Parameter '", func_params[i].second, "' has incompatible type with the Argument passed to it");
+    }
+    //If vargs exist and its not auto type vargs, check compatibility from params len as starting point till args len
+    if(has_vargs && vargs_type != EVAL_AUTO)
+    {
+        for (std::size_t i = params_len; i < args_len; ++i)
+        {
+            EvalType arg_type = func_args[i]->evaluateExprType();
+            if (arg_type != vargs_type)
+                printError("ParserError", "Variadic argument at position ", i, " has incompatible type");
+        }
     }
 
     //All set, create node and return
@@ -259,7 +294,10 @@ ASTPtr Parser::parse_while_loop()
 
 ASTPtr Parser::parse_iterator(const std::string& iter_id)
 {
-    //Right now there is only 1 iterator, that is RangeIterator, just return it for now
+    //Vargs iterator
+    if(match_types(TOKEN_ELLIPSIS))
+        return parse_ellipsis_iterator(iter_id);
+    
     return parse_range_iterator(iter_id, 0);
 }
 
@@ -339,6 +377,20 @@ ASTPtr Parser::parse_range_iterator(const std::string& iter_id, bool condition_o
     return create_range_iter_node(std::move(start), std::move(stop), std::move(step), iter_id, condition_or_construction);
 }
 
+ASTPtr Parser::parse_ellipsis_iterator(const std::string& iter_id)
+{
+    //Check if we can use ... or not
+    auto&&[type, idx] = get_type_from_symbol_table(current_token.token_value);
+    //Means we are not inside of a function having vargs or not inside of a function at all
+    if(type == EVAL_UNKNOWN)
+        printError("ParserError", "Can't use '...' syntax in 'For' loop. Can only be used inside of functions having Variadic Arguments");
+
+    //Advance past the '...'
+    advance();
+
+    return create_ellipsis_iter_node(type, iter_id);
+}
+
 ASTPtr Parser::parse_block()
 {
     if(!match_types(TOKEN_LBRACE)) printError("ParserError", "Expected '{' for statement");
@@ -407,8 +459,8 @@ ASTPtr Parser::parse_reassignment(EvalType var_type, std::uint16_t scope_index)
     if(var_type == expr_type || var_type == EVAL_AUTO)
     {
         //Add it to symbol table and create AST
-        set_value_to_nth_frame(identifier, var_expr, expr_type);
-        return create_variable_assign_node(expr_type, identifier, std::move(var_expr), true, scope_index);
+        set_value_to_nth_frame(identifier, var_expr, var_type);
+        return create_variable_assign_node(var_type, identifier, std::move(var_expr), true, scope_index);
     }
     //Oops, types dont match, errrorrrrr!
     printError("ParserError", "Evaluated expression type doesn't match the type pre-assigned to variable: ", identifier);
@@ -455,8 +507,8 @@ ASTPtr Parser::parse_declaration(EvalType var_type, std::uint16_t scope_index)
             if(var_type == expr_type || var_type == EVAL_AUTO)
             {
                 //Add it to symbol table and create AST
-                set_value_to_top_frame(identifier, var_expr, expr_type);
-                declarations.emplace_back(create_variable_assign_node(expr_type, identifier, std::move(var_expr), false, scope_index));
+                set_value_to_top_frame(identifier, var_expr, var_type);
+                declarations.emplace_back(create_variable_assign_node(var_type, identifier, std::move(var_expr), false, scope_index));
             }
             else
                 //Oops, types dont match, errrorrrrr!
@@ -625,7 +677,7 @@ ASTPtr Parser::parse_statement()
             //In case of 'Return;' the return type is 'void'
             if(match_types(TOKEN_SEMIC))
             {
-                if(current_return_type != EVAL_VOID)
+                if(current_return_type != EVAL_VOID && current_return_type != EVAL_AUTO)
                     printError("ParserError", "Function return type is not void, but 'Return;' found");
                 
                 function_return_value = create_return_node(nullptr);
@@ -635,7 +687,7 @@ ASTPtr Parser::parse_statement()
                 auto return_expr = parse_expr();
 
                 //See if this expression overall type is same as function return type
-                if(return_expr->evaluateExprType() != current_return_type)
+                if(return_expr->evaluateExprType() != current_return_type && current_return_type != EVAL_AUTO)
                     printError("ParserError", "Return type does not match the function's declared return type");
 
                 function_return_value = create_return_node(std::move(return_expr));
@@ -874,6 +926,11 @@ ASTPtr Parser::create_range_iter_node(ASTPtr&& start, ASTPtr&& stop, ASTPtr&& st
     return std::make_unique<ASTRangeIterator>(std::move(start), std::move(stop), std::move(step), iter_id, condition_or_construction);
 }
 
+ASTPtr Parser::create_ellipsis_iter_node(EvalType ellipsis_type, const std::string& iter_id)
+{
+    return std::make_unique<ASTEllipsisIterator>(ellipsis_type, iter_id);
+}
+
 ASTPtr Parser::create_block_node(ListOfASTPtr&& statements)
 {
     return std::make_unique<ASTBlock>(std::move(statements));
@@ -900,9 +957,9 @@ ASTPtr Parser::create_while_node(ASTPtr&& while_condition, ASTPtr&& while_body)
 }
 
 ASTPtr Parser::create_func_decl_node(EvalType return_type, const std::string& func_name,
-                                    FuncParams&& func_params, ASTPtr&& func_body)
+                                    FuncParams&& func_params, ASTPtr&& func_body, bool has_vargs, EvalType vargs_type)
 {
-    return std::make_unique<ASTFunctionDecl>(return_type, func_name, std::move(func_params), std::move(func_body));
+    return std::make_unique<ASTFunctionDecl>(return_type, func_name, std::move(func_params), std::move(func_body), has_vargs, vargs_type);
 }
 
 ASTPtr Parser::create_func_call_node(FuncArgs&& func_args, ASTFunctionDecl* initial_func)

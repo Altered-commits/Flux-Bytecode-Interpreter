@@ -18,6 +18,7 @@ enum EvalType : std::uint8_t
 
     //Expr evaluated to an iterator types
     EVAL_RANGE_ITER,
+    EVAL_ELLIPSIS_ITER,
 
     //Callable type: Function
     EVAL_CALLABLE,
@@ -29,7 +30,8 @@ enum EvalType : std::uint8_t
 //----------------------ITERATORS TYPES----------------------
 enum IteratorType : std::uint8_t
 {
-    RANGE_ITERATOR
+    RANGE_ITERATOR,
+    ELLIPSIS_ITERATOR
 };
 
 //----------------------INSTRUCTIONS TYPES----------------------
@@ -86,6 +88,7 @@ enum ILInstruction : std::uint8_t
     DESTROY_MULTIPLE_SYMBOL_TABLES, //Multiple levels
     //Functions, Return
     FUNC_START,
+    FUNC_VARGS,
     FUNC_CALL,
     FUNC_END,
     RETURN,
@@ -150,6 +153,7 @@ static const char* const ILInstructionToString(ILInstruction inst) {
         "CMP_LT",
         "CMP_GTEQ",
         "CMP_LTEQ",
+        "CMP_IS",
         "AND",
         "OR",
         "NOT",
@@ -165,6 +169,7 @@ static const char* const ILInstructionToString(ILInstruction inst) {
         "DESTROY_SYMBOL_TABLE",
         "DESTROY_MULTIPLE_SYMBOL_TABLES",
         "FUNC_START",
+        "FUNC_VARGS",
         "FUNC_CALL",
         "FUNC_END",
         "RETURN",
