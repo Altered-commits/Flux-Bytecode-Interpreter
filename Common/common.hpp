@@ -11,7 +11,7 @@
 //A tag telling what the expression is going to evaluate to, either an Integer, Float, etc
 enum EvalType : std::uint8_t
 {
-    EVAL_ANY, //Accept any type
+    EVAL_AUTO, //Accept any type, deduced by compiler
     EVAL_INT,
     EVAL_FLOAT,
     EVAL_VOID,

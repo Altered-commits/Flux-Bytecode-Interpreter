@@ -60,7 +60,7 @@ class Lexer
     private:
         //For Differentiation of keyword and identifier
         const std::unordered_map<std::string, TokenType> identifier_map = {
-            {"Any",      TOKEN_KEYWORD_ANY},
+            {"Auto",     TOKEN_KEYWORD_AUTO},
             {"Void",     TOKEN_KEYWORD_VOID},
             {"Int",      TOKEN_KEYWORD_INT},
             {"Float",    TOKEN_KEYWORD_FLOAT},

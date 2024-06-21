@@ -404,7 +404,7 @@ ASTPtr Parser::parse_reassignment(EvalType var_type, std::uint16_t scope_index)
     auto var_expr  = parse_expr();
     auto expr_type = var_expr->evaluateExprType();
 
-    if(var_type == expr_type || var_type == EVAL_ANY)
+    if(var_type == expr_type || var_type == EVAL_AUTO)
     {
         //Add it to symbol table and create AST
         set_value_to_nth_frame(identifier, var_expr, expr_type);
@@ -452,7 +452,7 @@ ASTPtr Parser::parse_declaration(EvalType var_type, std::uint16_t scope_index)
             auto var_expr  = parse_expr();
             auto expr_type = var_expr->evaluateExprType();
 
-            if(var_type == expr_type || var_type == EVAL_ANY)
+            if(var_type == expr_type || var_type == EVAL_AUTO)
             {
                 //Add it to symbol table and create AST
                 set_value_to_top_frame(identifier, var_expr, expr_type);
@@ -545,7 +545,7 @@ ASTPtr Parser::parse_statement()
     {
         case TOKEN_KEYWORD_FLOAT:
         case TOKEN_KEYWORD_INT:
-        case TOKEN_KEYWORD_ANY:
+        case TOKEN_KEYWORD_AUTO:
         {
             EvalType var_type = token_to_eval_type.at(current_token.token_type);
             advance();
@@ -726,7 +726,7 @@ ASTPtr Parser::parse_comp_expr()
     {
         advance();
         auto type = parse_type();
-        return create_binary_op_node(TOKEN_KEYWORD_IS, std::move(compExpr), create_value_node(type, std::to_string(type)));
+        return create_binary_op_node(TOKEN_KEYWORD_IS, std::move(compExpr), create_value_node(EVAL_INT, std::to_string(type)));
     }
 
     return compExpr;

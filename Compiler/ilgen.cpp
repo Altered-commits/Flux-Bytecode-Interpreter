@@ -48,6 +48,7 @@ void ILGenerator::visit(ASTValue& value_node, bool)
     //For constant values, push them onto the stack
     switch (value_node.type)
     {
+        case EVAL_AUTO: //For auto type, just push some initial value, doesn't matter the value but just a value
         case EVAL_INT:
             std::cout << "PUSH_INT64 ";
             il_code.emplace_back(ILInstruction::PUSH_INT64, std::stoll(value_node.value));
@@ -57,7 +58,7 @@ void ILGenerator::visit(ASTValue& value_node, bool)
             il_code.emplace_back(ILInstruction::PUSH_FLOAT, std::stod(value_node.value));
             break;
         default:
-            printError("ASTValue type not supported", value_node.type);
+            printError("ASTValue type not supported: ", value_node.type);
             break;
     }
     std::cout << value_node.value << '\n';
