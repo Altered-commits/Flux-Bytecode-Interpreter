@@ -26,10 +26,10 @@ using FunctionTable = std::unordered_map<std::size_t, ListOfInstruction>;
 //Again to be strictly used in ByteCodeInterpreter member functions
 #define IN_FUNC bool prevFuncStatus = isFunctionOngoing;\
                      isFunctionOngoing = true;\
-                   ++currentRecursionDepth;\
+                   ++currentCallStackDepth;\
                      functionStartingScope.emplace_back(globalSymbolTable.size());
 #define OUT_FUNC isFunctionOngoing = prevFuncStatus;\
-                    --currentRecursionDepth;\
+                    --currentCallStackDepth;\
                     functionStartingScope.pop_back();
 
 class ByteCodeInterpreter {
@@ -103,7 +103,7 @@ class ByteCodeInterpreter {
         //Function stuff
         FunctionTable     functionTable;
         bool              isFunctionOngoing = false;
-        std::uint32_t     maxRecursionDepth = 1000, currentRecursionDepth = 0;
+        std::uint32_t     maxCallStackDepth = 1000, currentCallStackDepth = 0;
         std::vector<std::uint16_t> functionStartingScope;
         std::vector<std::size_t>   functionStartingStack; //Might merge this and above vector in future
 };

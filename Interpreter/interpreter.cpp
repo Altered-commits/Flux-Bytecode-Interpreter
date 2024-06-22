@@ -74,7 +74,7 @@ void ByteCodeInterpreter::handleUnaryOperators()
 void ByteCodeInterpreter::handleVariableAssignment(ILInstruction inst, const std::string& identifier, const std::uint8_t scopeIndex)
 {
     auto elem = globalStack.back();
-    
+
     const bool shouldPop = inst != ASSIGN_VAR_NO_POP && inst != REASSIGN_VAR_NO_POP;
     const bool shouldReassign = inst == REASSIGN_VAR || inst == REASSIGN_VAR_NO_POP;
 
@@ -356,7 +356,7 @@ void ByteCodeInterpreter::decodeFile()
 
 void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstructions)
 {
-    if(currentRecursionDepth > maxRecursionDepth)
+    if(currentCallStackDepth > maxCallStackDepth)
         printRuntimeError("RecursionError", "Max recursion depth reached, over 1000 function calls");
 
     while(true)
@@ -473,7 +473,7 @@ void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstr
                 ByteCodeInterpreter::getInstance().interpretInstructions(functionTable.at(std::get<std::size_t>(i.value) - 1));
                 OUT_FUNC
             }
-                break;
+            break;
             case ILInstruction::FUNC_END:
                 handleFunctionEnd();
                 return;
@@ -660,6 +660,9 @@ void ByteCodeInterpreter::destroyFunctionScope()
 
 const Object& ByteCodeInterpreter::getValueFromNthFrame(const std::string& id, const std::uint8_t scopeIndex)
 {
+    //If it exists in global scope why even look thru all the scopes lmao
+    if(scopeIndex == 0)
+        return globalSymbolTable[0].at(id);
     //Functions use the slower version of symbol table getter thingy cuz,
     if(isFunctionOngoing)
         //If u can't get value from scope index, fuck compiler and fuck you.
@@ -670,10 +673,8 @@ const Object& ByteCodeInterpreter::getValueFromNthFrame(const std::string& id, c
             if(value != table.end())
                 return value->second;
         }
-    else
-        return globalSymbolTable[scopeIndex].at(id);
     
-    printRuntimeError("WTF?", "How did you even reach to this state, bruh?");
+    return globalSymbolTable[scopeIndex].at(id);
 }
 
 void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object&& elem)
@@ -683,7 +684,20 @@ void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object&& ele
 
 void ByteCodeInterpreter::setValueToNthFrame(const std::string& id, Object&& elem, const std::uint8_t scopeIndex)
 {
-    globalSymbolTable[scopeIndex][id] = std::move(elem);
+    //Same here as getNth function
+    if(scopeIndex == 0)
+        globalSymbolTable[scopeIndex][id] = std::move(elem);
+    //Again functions being weird
+    else if(isFunctionOngoing)
+        for (std::int32_t i = currentScope; i >= 0; --i)
+        {
+            auto& table = globalSymbolTable[i];
+            auto  value = table.find(id);
+            if(value != table.end())
+                value->second = std::move(elem);
+        }
+    else
+        globalSymbolTable[scopeIndex][id] = std::move(elem);
 }
 
 //File decoding related

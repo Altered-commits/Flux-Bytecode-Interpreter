@@ -1,16 +1,24 @@
+Int res = 998; //Max recursion limit for now
+
 Func<Auto> Summation(Auto ...)
 {
-    Auto result;
+    Auto sum;
+    
     For i in ... {
-        If (i is Int) {
-            result = result + i;
-        }
-        Elif (i is Float) {
-            result = result + i + 0.5;
-        }
+        sum = sum + i;
     }
 
-    Return result;
+    Return sum;
 }
 
-Summation(1, 2.5, 3, 4.5, 5, 6.5, 7, 8.5) + 0;
+Func<Auto> doFunc()
+{
+    If (res == 0) {
+        Return Summation(10, 20, 30, 40);
+    }
+    res = res - 1;
+    Return doFunc();
+}
+
+
+doFunc() + 0;
