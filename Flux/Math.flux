@@ -21,22 +21,12 @@ Func<Int> Pow(Int base, Int power)
     Return base ^ power;
 }
 
-Func<Int> Sqrt(Int base, Int root)
-{
-    Return Pow(base, -root);
-}
-
-Func<Int> Abs(Int value)
+Func<Auto> Abs(Auto value)
 {
     Return value < 0 ? -value : value;
 }
 
-Func<Int> Factorial(Int N)
-{
-    Return (N < 1 || N == 1) ? N : N * Factorial(N - 1);
-}
-
-Func<Int> GCD(Int a, Int b)
+Func<Auto> GCD(Auto a, Auto b)
 {
     If (b == 0) {
         Return a;
@@ -44,7 +34,7 @@ Func<Int> GCD(Int a, Int b)
     Return GCD(b, a % b);
 }
 
-Func<Int> LCM(Int a, Int b)
+Func<Auto> LCM(Auto a, Auto b)
 {
     Return (a * b) / GCD(a, b);
 }

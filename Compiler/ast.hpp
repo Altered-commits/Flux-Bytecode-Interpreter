@@ -481,9 +481,10 @@ struct ASTWhileNode : public ASTNode
 //--------------FUNCTIONS--------------
 struct ASTFunctionDecl : public ASTNode
 {
-    std::size_t starting_addr; //Set in ilgen
+    //'starting_addr' set in ilgen
+    std::size_t starting_addr;
     std::string function_name;
-    //Parameter -> Datatype, identifier
+    //Function Parameter -> Datatype, identifier
     FuncParams  function_params;
     EvalType    function_return_type;
     ASTPtr      function_body;

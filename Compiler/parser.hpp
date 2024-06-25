@@ -102,7 +102,7 @@ class Parser
         void                               set_value_to_nth_frame(const std::string&, const ASTPtr&, EvalType);
         std::pair<EvalType, std::uint16_t> get_type_from_symbol_table(const std::string&);
         ASTRawPtr                          get_expr_from_symbol_table(const std::string&);
-        bool                               find_variable_from_current_scope(const std::string&);
+        bool                               find_id_from_current_scope(const std::string&);
         void                               create_scope();
         void                               destroy_scope();
 

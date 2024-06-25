@@ -5,18 +5,13 @@
 
 //Just easier to write 
 #define STACK_REVERSE_ACCESS_ELEM(n) (globalStack[globalStack.size() - n])
+#define GLOBAL_INDEX 0
 
-//Global Stack
-std::vector<Object> globalStack;
-
-//Global symbol table (stack based scope, using vector)
-std::vector<std::unordered_map<std::string, Object>> globalSymbolTable;
-
-//Iterator stack
-std::vector<IterPtr> globalIteratorStack;
-
-//Emulating register (sort of) for return value
-Object returnRegister;
+//All the bery useful stuff used by any (good / working) interpreter
+ObjectStack   globalStack;
+SymbolTable   globalSymbolTable;
+IteratorStack globalIteratorStack;
+Object        returnRegister; //Return value of function pushed to this register thingy
 
 //Think of this as program counter
 std::uint64_t globalInstructionIndex = 0;
@@ -357,7 +352,7 @@ void ByteCodeInterpreter::decodeFile()
 void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstructions)
 {
     if(currentCallStackDepth > maxCallStackDepth)
-        printRuntimeError("RecursionError", "Max recursion depth reached, over 1000 function calls");
+        printRuntimeError("RecursionError", "Max call stack depth reached, over 1000 function calls");
 
     while(true)
     {
@@ -635,46 +630,27 @@ void ByteCodeInterpreter::pushInstructionValue(const InstructionValue& val)
 //Symbol table related
 void ByteCodeInterpreter::createSymbolTable()
 {
-    ++currentScope;
     globalSymbolTable.emplace_back();
 }
 
 void ByteCodeInterpreter::destroySymbolTable()
 {
-    --currentScope;
     globalSymbolTable.pop_back();   
 }
 
 void ByteCodeInterpreter::destroyMultipleSymbolTables(std::uint16_t scopesToDestroy)
 {
-    currentScope = std::max(0, currentScope - scopesToDestroy);
     globalSymbolTable.erase(globalSymbolTable.end() - scopesToDestroy, globalSymbolTable.end());
 }
 
 void ByteCodeInterpreter::destroyFunctionScope()
 {
-    std::size_t fallbackToScope = functionStartingScope.back();
-    globalSymbolTable.resize(fallbackToScope);
-    currentScope = fallbackToScope - 1;
+    globalSymbolTable.resize(functionStartingScope.back());
 }
 
 const Object& ByteCodeInterpreter::getValueFromNthFrame(const std::string& id, const std::uint8_t scopeIndex)
 {
-    //If it exists in global scope why even look thru all the scopes lmao
-    if(scopeIndex == 0)
-        return globalSymbolTable[0].at(id);
-    //Functions use the slower version of symbol table getter thingy cuz,
-    if(isFunctionOngoing)
-        //If u can't get value from scope index, fuck compiler and fuck you.
-        for (std::int32_t i = currentScope; i >= 0; --i)
-        {
-            auto& table = globalSymbolTable[i];
-            auto  value = table.find(id);
-            if(value != table.end())
-                return value->second;
-        }
-    
-    return globalSymbolTable[scopeIndex].at(id);
+    return globalSymbolTable[(scopeIndex != 0) * (functionStartingScope.back() + scopeIndex - 1)].at(id);
 }
 
 void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object&& elem)
@@ -684,31 +660,18 @@ void ByteCodeInterpreter::setValueToTopFrame(const std::string& id, Object&& ele
 
 void ByteCodeInterpreter::setValueToNthFrame(const std::string& id, Object&& elem, const std::uint8_t scopeIndex)
 {
-    //Same here as getNth function
-    if(scopeIndex == 0)
-        globalSymbolTable[scopeIndex][id] = std::move(elem);
-    //Again functions being weird
-    else if(isFunctionOngoing)
-        for (std::int32_t i = currentScope; i >= 0; --i)
-        {
-            auto& table = globalSymbolTable[i];
-            auto  value = table.find(id);
-            if(value != table.end())
-                value->second = std::move(elem);
-        }
-    else
-        globalSymbolTable[scopeIndex][id] = std::move(elem);
+    globalSymbolTable[(scopeIndex != 0) * (functionStartingScope.back() + scopeIndex - 1)][id] = std::move(elem);
 }
 
 //File decoding related
-void ByteCodeInterpreter::readFileChunk(std::array<Byte, FILE_READ_CHUNK_SIZE>& chunkBuffer, std::size_t& chunkBufferIndex)
+void ByteCodeInterpreter::readFileChunk(ByteArray& chunkBuffer, std::size_t& chunkBufferIndex)
 {
     inFile.read(chunkBuffer.data(), FILE_READ_CHUNK_SIZE);
     chunkBufferIndex = 0;
 }
 
 template<typename T>
-T ByteCodeInterpreter::readOperand(std::array<Byte, FILE_READ_CHUNK_SIZE>& chunkBuffer, std::size_t& chunkBufferIndex)
+T ByteCodeInterpreter::readOperand(ByteArray& chunkBuffer, std::size_t& chunkBufferIndex)
 {
     //IF rest of the stuff is outside of current chunk, handle it
     if(chunkBufferIndex + sizeof(T) > chunkBuffer.size())
@@ -744,7 +707,7 @@ T ByteCodeInterpreter::readOperand(std::array<Byte, FILE_READ_CHUNK_SIZE>& chunk
     return value;
 }
 
-std::string& ByteCodeInterpreter::readStringOperand(std::array<Byte, FILE_READ_CHUNK_SIZE>& chunkBuffer, std::size_t& chunkBufferIndex)
+std::string& ByteCodeInterpreter::readStringOperand(ByteArray& chunkBuffer, std::size_t& chunkBufferIndex)
 {
     //Read length of string first
     std::size_t strLength = readOperand<std::size_t>(chunkBuffer, chunkBufferIndex);

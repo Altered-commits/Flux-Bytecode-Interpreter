@@ -1,9 +1,6 @@
 #ifndef UNNAMED_INTEPRETER_HPP
 #define UNNAMED_INTEPRETER_HPP
 
-//File decoding related
-#define FILE_READ_CHUNK_SIZE 2048
-
 #include <fstream>
 #include <iostream>
 #include <cmath>
@@ -14,23 +11,28 @@
 #include <unordered_map>
 
 #include "..\Common\common.hpp"
-//Will later make this common for both compiler and interpreter
 #include "..\Common\error_printer.hpp"
 
+//Just to simply make the horrendous c++ code look much better
 using Byte   = char;
 using Object = std::variant<std::uint64_t, std::int64_t, std::double_t>; //Had no other name
-using FunctionTable = std::unordered_map<std::size_t, ListOfInstruction>;
 
 #include "iterators.hpp"
+//File decoding related
+#define FILE_READ_CHUNK_SIZE 2048
+
+//Same for these as well...
+using FunctionTable = std::unordered_map<std::size_t, ListOfInstruction>;
+using SymbolTable   = std::vector<std::unordered_map<std::string, Object>>;
+using IteratorStack = std::vector<IterPtr>;
+using ObjectStack   = std::vector<Object>;
+using ByteArray     = std::array<Byte, FILE_READ_CHUNK_SIZE>;
 
 //Again to be strictly used in ByteCodeInterpreter member functions
-#define IN_FUNC bool prevFuncStatus = isFunctionOngoing;\
-                     isFunctionOngoing = true;\
-                   ++currentCallStackDepth;\
-                     functionStartingScope.emplace_back(globalSymbolTable.size());
-#define OUT_FUNC isFunctionOngoing = prevFuncStatus;\
-                    --currentCallStackDepth;\
-                    functionStartingScope.pop_back();
+#define IN_FUNC ++currentCallStackDepth;\
+                functionStartingScope.emplace_back(globalSymbolTable.size());
+#define OUT_FUNC --currentCallStackDepth;\
+                 functionStartingScope.pop_back();
 
 class ByteCodeInterpreter {
     private:
@@ -90,21 +92,19 @@ class ByteCodeInterpreter {
 
     //File decoding related
     private:
-        void readFileChunk(std::array<Byte, FILE_READ_CHUNK_SIZE>&, std::size_t&);
+        void readFileChunk(ByteArray&, std::size_t&);
         template<typename T>
-        T readOperand(std::array<Byte, FILE_READ_CHUNK_SIZE>&, std::size_t&);
-        std::string& readStringOperand(std::array<Byte, FILE_READ_CHUNK_SIZE>&, std::size_t&);
+        T readOperand(ByteArray&, std::size_t&);
+        std::string& readStringOperand(ByteArray&, std::size_t&);
     
     private:
         ListOfInstruction instructions;
         std::string       currentVariable;
         std::ifstream     inFile;
-        std::int32_t      currentScope = 0;
         //Function stuff
         FunctionTable     functionTable;
-        bool              isFunctionOngoing = false;
         std::uint32_t     maxCallStackDepth = 1000, currentCallStackDepth = 0;
-        std::vector<std::uint16_t> functionStartingScope;
+        std::vector<std::uint16_t> functionStartingScope = {1}; // Initial (main) scope u could say
         std::vector<std::size_t>   functionStartingStack; //Might merge this and above vector in future
 };
 #endif

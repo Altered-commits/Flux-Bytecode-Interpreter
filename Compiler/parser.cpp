@@ -77,14 +77,19 @@ ASTPtr Parser::parse_function_decl()
     //For dummy nodes so they have some lifetime and not instantly be dead
     ListOfASTPtr temporary_dummy_scope;
 
-    create_scope();
     EvalType return_type = parse_type_as_param();
     
     if(!match_types(TOKEN_ID))
         printError("ParserError", "Expected identifier for function name");
 
     std::string identifier = std::move(current_token.token_value);
+    //Check if the identifier isn't already declared
+    if(find_id_from_current_scope(identifier))
+        printError("ParserError", "Function name '", identifier, "' already exists (either as a variable or some other function name), use another one");
     advance();
+
+    //Create scope after we validate identifier
+    create_scope();
 
     if(!match_types(TOKEN_LPAREN))
         printError("ParserError", "Expected '(' after identifier");
@@ -479,7 +484,7 @@ ASTPtr Parser::parse_declaration(EvalType var_type, std::uint16_t scope_index)
 
         //Variable name should not clash with the existing names
         std::string identifier = std::move(current_token.token_value);
-        if(find_variable_from_current_scope(identifier))
+        if(find_id_from_current_scope(identifier))
             printError("ParserError", "Current variable: '", identifier, "' already exists, use another name");
 
         advance();
@@ -1043,7 +1048,7 @@ ASTRawPtr Parser::get_expr_from_symbol_table(const std::string& id)
     printError("SymbolTableError", "Error getting 'expr' from symbol table");
 }
 
-bool Parser::find_variable_from_current_scope(const std::string& identifier)
+bool Parser::find_id_from_current_scope(const std::string& identifier)
 {
     auto symbol = temporary_symbol_table.back().find(identifier);
     return symbol != temporary_symbol_table.back().end();    

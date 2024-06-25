@@ -1,4 +1,11 @@
-Int res = 998; //Max recursion limit for now
+include Flux.Math
+
+Auto res = 100;
+
+Func<Auto> Factorial(Auto N)
+{
+    Return (N < 1 || N == 1) ? N : N * Factorial(N - 1);
+}
 
 Func<Auto> Summation(Auto ...)
 {
@@ -14,11 +21,10 @@ Func<Auto> Summation(Auto ...)
 Func<Auto> doFunc()
 {
     If (res == 0) {
-        Return Summation(10, 20, 30, 40);
+        Return Abs(LCM(Factorial(Summation(1, 2, 3, 4, 5)), Factorial(Summation(1, 2, 3, 4, 5))));
     }
     res = res - 1;
     Return doFunc();
 }
-
 
 doFunc() + 0;
