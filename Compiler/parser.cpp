@@ -141,7 +141,7 @@ ASTPtr Parser::parse_function_decl()
     set_value_to_top_frame(identifier, func_node, EVAL_CALLABLE);
     
     SAVE_RETURN_TYPE(return_type)
-    ASTPtr func_body = parse_block();
+    ASTPtr func_body = parse_block(true);
     RESTORE_RETURN_TYPE
     
     //Weird ahh syntax but this allows me to set its body manually
@@ -396,7 +396,7 @@ ASTPtr Parser::parse_ellipsis_iterator(const std::string& iter_id)
     return create_ellipsis_iter_node(type, iter_id);
 }
 
-ASTPtr Parser::parse_block()
+ASTPtr Parser::parse_block(bool is_func)
 {
     if(!match_types(TOKEN_LBRACE)) printError("ParserError", "Expected '{' for statement");
     advance();
@@ -404,11 +404,22 @@ ASTPtr Parser::parse_block()
     ListOfASTPtr statements;
     while(!match_types(TOKEN_RBRACE))
     {
-        auto statement = parse_statement();
-        //Add to list of statements
-        statements.emplace_back(std::move(statement));
+        auto stmt = parse_statement();
+        
+        //-------Tailcall handling-------
+        if((is_func) && (stmt->getTag() == ASTTag::Return)) {
+            const auto return_stmt = static_cast<ASTReturn*>(stmt.get());
+            
+            if(return_stmt->return_expr->getTag() == ASTTag::FunctionCall) {
+                const auto func_call = static_cast<ASTFunctionCall*>(return_stmt->return_expr.get());
+                //Set tailcall to true only if its recursion, vargs does not support TCO for now
+                func_call->isTailCall = (func_call->initial_func->function_body == nullptr) && (!func_call->initial_func->has_vargs);
+            }
+        }
+        
+        statements.emplace_back(std::move(stmt));
     }
-    
+        
     if(!match_types(TOKEN_RBRACE)) printError("ParserError", "Expected '}' for statement");
     advance();
 

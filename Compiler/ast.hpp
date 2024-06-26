@@ -46,6 +46,8 @@ enum class ASTTag {
     Unary,
     VarAccess,
     Cast,
+    Return,
+    FunctionCall,
     Dummy
 };
 
@@ -447,6 +449,11 @@ struct ASTReturn : public ASTNode
         
         return EVAL_VOID;
     }
+
+    //Tag
+    ASTTag getTag() const override {
+        return ASTTag::Return;
+    }
 };
 
 //--------------LOOPS--------------
@@ -506,6 +513,7 @@ struct ASTFunctionCall : public ASTNode
 {
     FuncArgs         function_args;
     ASTFunctionDecl* initial_func;
+    bool             isTailCall = false; //Set by parse_block
 
     ASTFunctionCall(FuncArgs&& func_args, ASTFunctionDecl* initial_func)
         : function_args(std::move(func_args)), initial_func(initial_func)
@@ -518,6 +526,11 @@ struct ASTFunctionCall : public ASTNode
     //To be able to assign function calls to variables as well
     EvalType evaluateExprType() const override {
         return initial_func->function_return_type;
+    }
+
+    //Tag
+    ASTTag getTag() const override {
+        return ASTTag::FunctionCall;
     }
 };
 

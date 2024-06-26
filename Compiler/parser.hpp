@@ -68,7 +68,7 @@ class Parser
         ASTPtr parse_iterator(const std::string&);
         ASTPtr parse_range_iterator(const std::string&, bool);
         ASTPtr parse_ellipsis_iterator(const std::string&);
-        ASTPtr parse_block();
+        ASTPtr parse_block(bool = false);
         ASTPtr parse_cast();
         ASTPtr parse_variable(EvalType, bool, std::uint16_t);
         ASTPtr parse_reassignment(EvalType, std::uint16_t);

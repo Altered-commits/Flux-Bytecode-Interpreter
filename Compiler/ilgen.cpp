@@ -519,6 +519,24 @@ void ILGenerator::visit(ASTFunctionDecl& func_decl_node, bool is_sub_expr)
 
 void ILGenerator::visit(ASTFunctionCall& func_call_node, bool is_sub_expr)
 {
+    if(func_call_node.isTailCall)
+    {
+        std::cout << "TAIL_CALL_OPTIMIZED\n";
+        //Only for functions without vargs
+        for (auto it = func_call_node.function_args.rbegin(); 
+                  it != func_call_node.function_args.rend();
+                  ++it) 
+            (*it)->accept(*this, is_sub_expr);
+
+        //Jump to the start of the function
+        std::cout << "FUNC_TAIL_CALL\n";
+        il_code.emplace_back(ILInstruction::JUMP, 1ULL);
+        INC_CURRENT_OFFSET;
+
+        //Since we are reusing the stack frame, there's no need to update the return address
+        return;
+    }
+
     std::cout << "PUSH_UINT64 RETADDR\n";
     il_code.emplace_back(PUSH_UINT64);
     INC_CURRENT_OFFSET
