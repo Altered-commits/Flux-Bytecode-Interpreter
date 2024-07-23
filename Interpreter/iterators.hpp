@@ -58,7 +58,7 @@ class RangeIterator : public Iterator
         T start, stop, step;
 };
 
-//Reverse iteration, going from start to end is reverse apparently and idk how that happened, so we go from end to start
+//Reverse iteration, going from start to end is reverse 
 class EllipsisIterator : public Iterator
 {
 public:

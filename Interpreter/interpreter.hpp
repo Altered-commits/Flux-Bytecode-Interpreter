@@ -18,6 +18,8 @@ using Byte   = char;
 using Object = std::variant<std::uint64_t, std::int64_t, std::double_t>; //Had no other name
 
 #include "iterators.hpp"
+#include "builtins.hpp"
+
 //File decoding related
 #define FILE_READ_CHUNK_SIZE 2048
 
@@ -36,7 +38,7 @@ using ByteArray     = std::array<Byte, FILE_READ_CHUNK_SIZE>;
 
 class ByteCodeInterpreter {
     private:
-        ByteCodeInterpreter() {}
+        ByteCodeInterpreter() = default;
 
         ByteCodeInterpreter(const ByteCodeInterpreter&) = delete;
         ByteCodeInterpreter(ByteCodeInterpreter&&)      = delete;
@@ -71,7 +73,7 @@ class ByteCodeInterpreter {
         void handleIteratorNext(std::size_t);
         //Function and Return
         void handleReturn(std::size_t);
-        void handleFunctionEnd();
+        void handleFunctionEnd(std::uint16_t);
     
     //Symbol table related
     private:

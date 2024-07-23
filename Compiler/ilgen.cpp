@@ -187,14 +187,13 @@ void ILGenerator::visit(ASTVariableAssign& var_assign_node, bool is_sub_expr)
     }
     //Normal assignment = don't care about scope index
     //Re assignment = we care about scope index
-    if(var_assign_node.is_reassignment)
-    {
+    if(var_assign_node.is_reassignment) {
         std::cout << "SCOPE_INDEX: " << (int)var_assign_node.scope_index << '\n';
-        il_code.emplace_back(ILInstruction::DATAINST_VAR_SCOPE_IDX, 0, var_assign_node.scope_index);
-        INC_CURRENT_OFFSET
+        // il_code.emplace_back(ILInstruction::DATAINST_VAR_SCOPE_IDX, 0, var_assign_node.scope_index);
+        // INC_CURRENT_OFFSET
     }
 
-    il_code.emplace_back(inst, std::move(var_assign_node.identifier));
+    il_code.emplace_back(inst, std::move(var_assign_node.identifier), var_assign_node.scope_index);
     INC_CURRENT_OFFSET
 }
 
@@ -204,10 +203,10 @@ void ILGenerator::visit(ASTVariableAccess& var_access_node, bool)
               << "SCOPE_INDEX: " << (int)var_access_node.scope_index << '\n';
     
     //Pass the scope index as well with special DATAINST instructions
-    il_code.emplace_back(ILInstruction::DATAINST_VAR_SCOPE_IDX, 0, var_access_node.scope_index);
-    il_code.emplace_back(ILInstruction::ACCESS_VAR, std::move(var_access_node.identifier));
+    // il_code.emplace_back(ILInstruction::DATAINST_VAR_SCOPE_IDX, 0, var_access_node.scope_index);
+    il_code.emplace_back(ILInstruction::ACCESS_VAR, std::move(var_access_node.identifier), var_access_node.scope_index);
 
-    INCN_CURRENT_OFFSET(2)
+    INC_CURRENT_OFFSET
 }
 
 void ILGenerator::visit(ASTCastNode& expr, bool)
@@ -509,7 +508,7 @@ void ILGenerator::visit(ASTFunctionDecl& func_decl_node, bool is_sub_expr)
     func_decl_node.function_body->accept(*this, is_sub_expr);
 
     std::cout << "FUNC_END\n";
-    il_code.emplace_back(ILInstruction::FUNC_END);
+    il_code.emplace_back(ILInstruction::FUNC_END, (std::uint16_t)(func_decl_node.vargs_type));
     INC_CURRENT_OFFSET
 
     handleReturnIfExists(GET_CURRENT_OFFSET - 1);
@@ -517,9 +516,30 @@ void ILGenerator::visit(ASTFunctionDecl& func_decl_node, bool is_sub_expr)
     DELETE_OFFSET_SCOPE
 }
 
+void ILGenerator::visit(ASTBuiltinFunctionCall& builtin_node, bool is_sub_expr)
+{
+    //Since all of this is builtin, no need to create any stack frame or anything
+    for (auto it = builtin_node.function_args.rbegin(); 
+              it != builtin_node.function_args.rend();
+              ++it) 
+        (*it)->accept(*this, true);
+    
+    if(builtin_node.has_vargs)
+    {
+        il_code.emplace_back(ILInstruction::PUSH_UINT64, builtin_node.function_args.size());
+        std::cout << "PUSH_UINT64 " << builtin_node.function_args.size() << '\n';
+        INC_CURRENT_OFFSET
+    }
+
+    //Smallest possible value is 16bit uint
+    il_code.emplace_back(ILInstruction::BUILTIN_CALL, (std::uint16_t)builtin_node.call_number);
+    std::cout << "BUILTIN_CALL " << (int)builtin_node.call_number << '\n';
+    INC_CURRENT_OFFSET
+}
+
 void ILGenerator::visit(ASTFunctionCall& func_call_node, bool is_sub_expr)
 {
-    if(func_call_node.isTailCall)
+    if(func_call_node.is_tail_call)
     {
         std::cout << "TAIL_CALL_OPTIMIZED\n";
         //Only for functions without vargs
@@ -544,7 +564,7 @@ void ILGenerator::visit(ASTFunctionCall& func_call_node, bool is_sub_expr)
     std::size_t ret_addr = il_code.size() - 1;
     
     //Push the size / len of vargs so it sits right after return address
-    if(func_call_node.initial_func->has_vargs)
+    if(func_call_node.initial_func->vargs_type != EVAL_UNKNOWN)
     {
         //Take number of args and minus it with number of params, thats the amount of vargs we have rn
         auto params_len = func_call_node.initial_func->function_params.size();
@@ -623,7 +643,6 @@ void ILGenerator::visit(ASTReturn& node, bool is_sub_expr)
     {
         node.return_expr->accept(*this, true);
         std::cout << "RETURN\n";
-
     }
     else {
         std::cout << "RETURN NONE\n";
@@ -635,5 +654,5 @@ void ILGenerator::visit(ASTReturn& node, bool is_sub_expr)
 }
 
 //DUMMY NODE, CAN IGNORE
-void ILGenerator::visit(ASTDummyNode& node, bool)
+void ILGenerator::visit(ASTDummyNode&, bool)
 {}

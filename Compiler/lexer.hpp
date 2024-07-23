@@ -19,11 +19,8 @@ class Lexer
 {
     public:
         Lexer(const std::string& text)
-            : text(std::move(text)), text_length(text.length())
-        {
-            cur_pos = 0;
-            cur_chr = text[cur_pos];
-        }
+            : text(std::move(text)), text_length(text.length()), cur_pos(0), cur_chr(text[cur_pos])
+        {}
 
         Token& get_token();
         Token& get_current_token();
@@ -77,7 +74,6 @@ class Lexer
             {"Break",    TOKEN_KEYWORD_BREAK},
             {"Return",   TOKEN_KEYWORD_RETURN},
         };
-
 };
 
 //SO THAT THIS DOESNT GIVE ERROR OF INCOMPLETE TYPE

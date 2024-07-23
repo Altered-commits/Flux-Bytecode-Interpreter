@@ -67,6 +67,7 @@ struct ASTForNode;
 struct ASTWhileNode;
 struct ASTFunctionDecl;
 struct ASTFunctionCall;
+struct ASTBuiltinFunctionCall;
 struct ASTContinue;
 struct ASTBreak;
 struct ASTReturn;
@@ -78,25 +79,26 @@ struct ASTDummyNode;
 class ASTVisitorInterface
 {
     public:
-        virtual void visit(ASTValue& node, bool)            = 0;
-        virtual void visit(ASTBinaryOp& node, bool)         = 0;
-        virtual void visit(ASTUnaryOp& node, bool)          = 0;
-        virtual void visit(ASTVariableAssign& node, bool)   = 0;
-        virtual void visit(ASTVariableAccess& node, bool)   = 0;
-        virtual void visit(ASTCastNode& node, bool)         = 0;
-        virtual void visit(ASTBlock& node, bool)            = 0;
-        virtual void visit(ASTTernaryOp& node, bool)        = 0;
-        virtual void visit(ASTIfNode& node, bool)           = 0;
-        virtual void visit(ASTRangeIterator& node, bool)    = 0;
-        virtual void visit(ASTEllipsisIterator& node, bool) = 0;
-        virtual void visit(ASTForNode& node, bool)          = 0;
-        virtual void visit(ASTWhileNode& node, bool)        = 0;
-        virtual void visit(ASTFunctionDecl& node, bool)     = 0;
-        virtual void visit(ASTFunctionCall& node, bool)     = 0;
-        virtual void visit(ASTContinue& node, bool)         = 0;
-        virtual void visit(ASTBreak& node, bool)            = 0;
-        virtual void visit(ASTReturn& node, bool)           = 0;
-        virtual void visit(ASTDummyNode& node, bool)        = 0;
+        virtual void visit(ASTValue& node, bool)               = 0;
+        virtual void visit(ASTBinaryOp& node, bool)            = 0;
+        virtual void visit(ASTUnaryOp& node, bool)             = 0;
+        virtual void visit(ASTVariableAssign& node, bool)      = 0;
+        virtual void visit(ASTVariableAccess& node, bool)      = 0;
+        virtual void visit(ASTCastNode& node, bool)            = 0;
+        virtual void visit(ASTBlock& node, bool)               = 0;
+        virtual void visit(ASTTernaryOp& node, bool)           = 0;
+        virtual void visit(ASTIfNode& node, bool)              = 0;
+        virtual void visit(ASTRangeIterator& node, bool)       = 0;
+        virtual void visit(ASTEllipsisIterator& node, bool)    = 0;
+        virtual void visit(ASTForNode& node, bool)             = 0;
+        virtual void visit(ASTWhileNode& node, bool)           = 0;
+        virtual void visit(ASTFunctionDecl& node, bool)        = 0;
+        virtual void visit(ASTFunctionCall& node, bool)        = 0;
+        virtual void visit(ASTBuiltinFunctionCall& node, bool) = 0;
+        virtual void visit(ASTContinue& node, bool)            = 0;
+        virtual void visit(ASTBreak& node, bool)               = 0;
+        virtual void visit(ASTReturn& node, bool)              = 0;
+        virtual void visit(ASTDummyNode& node, bool)           = 0;
 };
 
 //AST nodes
@@ -238,7 +240,7 @@ struct ASTVariableAccess : public ASTNode
     }
 
     bool isCallable() const {
-        return var_type == EVAL_CALLABLE;
+        return var_type == EVAL_CALLABLE || var_type == EVAL_BUILTIN;
     }
 
     EvalType evaluateExprType() const override {
@@ -350,7 +352,7 @@ struct ASTRangeIterator : public ASTBaseIterator
     //The way i want it is, start..stop..step, also it can be a binary expression so yeah
     ASTPtr start, stop, step;
     //0 is condition, 1 is construction (should range be used as condition or to contruct something)
-    bool condition_or_construction = 0;
+    bool condition_or_construction = 0; //For future use
 
     ASTRangeIterator(ASTPtr&& start, ASTPtr&& stop, ASTPtr&& step, const std::string& iter_id, bool coc) //coc lmfao
         : start(std::move(start)), stop(std::move(stop)), step(std::move(step)), condition_or_construction(coc)
@@ -495,13 +497,12 @@ struct ASTFunctionDecl : public ASTNode
     FuncParams  function_params;
     EvalType    function_return_type;
     ASTPtr      function_body;
-    bool        has_vargs;
-    EvalType    vargs_type;
+    EvalType    vargs_type; //If vargs exist, this wouldn't be EVAL_UNKNOWN
 
     ASTFunctionDecl(EvalType func_ret_type, const std::string& func_name,
-                    FuncParams&& func_params, ASTPtr&& func_body, bool has_vargs, EvalType vargs_type)
+                    FuncParams&& func_params, ASTPtr&& func_body, EvalType vargs_type)
         : function_name(std::move(func_name)), function_params(std::move(func_params)),
-          function_return_type(func_ret_type), function_body(std::move(func_body)), has_vargs(has_vargs), vargs_type(vargs_type)
+          function_return_type(func_ret_type), function_body(std::move(func_body)), vargs_type(vargs_type)
     {}
 
     void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
@@ -509,11 +510,31 @@ struct ASTFunctionDecl : public ASTNode
     }
 };
 
+struct ASTBuiltinFunctionCall : public ASTNode
+{
+    FuncArgs     function_args;
+    EvalType     function_return_type;
+    bool         has_vargs;
+    std::uint8_t call_number;
+
+    ASTBuiltinFunctionCall(std::uint8_t call_number, EvalType func_ret_type, FuncArgs&& func_args, bool has_vargs)
+        : function_args(std::move(func_args)), function_return_type(func_ret_type), call_number(call_number), has_vargs(has_vargs)
+    {}
+
+    void accept(ASTVisitorInterface& visitor, bool is_sub_expr) override {
+        visitor.visit(*this, is_sub_expr);
+    }
+
+    EvalType evaluateExprType() const override {
+        return function_return_type;
+    }
+};
+
 struct ASTFunctionCall : public ASTNode
 {
     FuncArgs         function_args;
     ASTFunctionDecl* initial_func;
-    bool             isTailCall = false; //Set by parse_block
+    bool             is_tail_call = false; //Set by parse_block
 
     ASTFunctionCall(FuncArgs&& func_args, ASTFunctionDecl* initial_func)
         : function_args(std::move(func_args)), initial_func(initial_func)

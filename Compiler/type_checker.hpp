@@ -17,25 +17,25 @@
 #define ADD_BINARY_OP_CHECKER(Type)                 {Type, binaryOpTypeEvaluator}
 #define ADD_COMPARISION_OR_LOGICAL_OP_CHECKER(Type) {Type, comparisionAndLogicalOpTypeEvaluator}
 
-//Hasher for Pair<EvalType, EvalType> using FNV-1a
+//Hasher for Pair<EvalType, EvalType> using FNV-1a, copied online
 struct PairHasher {
     std::size_t operator () (const std::pair<EvalType, EvalType>& p) const {
         constexpr uint64_t prime1 = 1099511628211ull;
         constexpr uint64_t prime2 = 1099511628219ull;
 
-        uint64_t hash_value = 14695981039346656037ull; // FNV-1a offset basis
+        uint64_t hashValue = 14695981039346656037ull; // FNV-1a offset basis
 
-        hash_value ^= static_cast<std::uint64_t>(p.first);
-        hash_value *= prime1;
-        hash_value ^= static_cast<std::uint64_t>(p.second);
-        hash_value *= prime2;
+        hashValue ^= static_cast<std::uint64_t>(p.first);
+        hashValue *= prime1;
+        hashValue ^= static_cast<std::uint64_t>(p.second);
+        hashValue *= prime2;
 
         // Mix bits to distribute more evenly
-        hash_value ^= hash_value >> 31;
-        hash_value *= 0x85ebca6b;
-        hash_value ^= hash_value >> 33;
+        hashValue ^= hashValue >> 31;
+        hashValue *= 0x85ebca6b;
+        hashValue ^= hashValue >> 33;
 
-        return static_cast<std::size_t>(hash_value);
+        return static_cast<std::size_t>(hashValue);
     }
 };
 

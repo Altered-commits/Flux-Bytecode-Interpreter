@@ -96,8 +96,7 @@ ASTPtr Parser::parse_function_decl()
     advance();
     
     FuncParams func_params;
-    bool       has_vargs  = false;
-    EvalType   vargs_type;
+    EvalType   vargs_type = EVAL_UNKNOWN;
 
     while (!match_types(TOKEN_RPAREN))
     {
@@ -107,10 +106,8 @@ ASTPtr Parser::parse_function_decl()
         if(match_types(TOKEN_ELLIPSIS)) {
             //Used to detect if func has vargs by statements in function body
             set_value_to_top_frame(current_token.token_value, nullptr, param_type);
-
             advance();
 
-            has_vargs = true;
             vargs_type = param_type;
             //Vargs must be the last parameter in function decl
             break;
@@ -137,7 +134,7 @@ ASTPtr Parser::parse_function_decl()
     advance();
 
     //Pre set it to symbol table once to allow recursive calls to be a thing
-    auto func_node = create_func_decl_node(return_type, identifier, std::move(func_params), nullptr, has_vargs, vargs_type);
+    auto func_node = create_func_decl_node(return_type, identifier, std::move(func_params), nullptr, vargs_type);
     set_value_to_top_frame(identifier, func_node, EVAL_CALLABLE);
     
     SAVE_RETURN_TYPE(return_type)
@@ -159,8 +156,8 @@ ASTPtr Parser::parse_function_call(const std::string& func_name)
     ASTFunctionDecl* inital_function = static_cast<ASTFunctionDecl*>(get_expr_from_symbol_table(func_name));
     FuncArgs         func_args       = parse_list(TOKEN_LPAREN, TOKEN_RPAREN);
     FuncParams&      func_params     = inital_function->function_params;
-    bool             has_vargs       = inital_function->has_vargs;
     EvalType         vargs_type      = inital_function->vargs_type;
+    bool             has_vargs       = vargs_type != EVAL_UNKNOWN;
 
     std::size_t args_len = func_args.size(), params_len = func_params.size();
 
@@ -168,7 +165,7 @@ ASTPtr Parser::parse_function_call(const std::string& func_name)
     if(has_vargs && args_len < params_len)
         printError("ParserError", "Function '", func_name, "' expected atleast ", params_len, " arguments but got ", args_len);
     //Check if len of function params matches len of func_args, if it doesn't, error
-    else if(!has_vargs && args_len != params_len)
+    if(!has_vargs && args_len != params_len)
         printError("ParserError", "Function '", func_name, "' expected ", params_len, " arguments but got ", args_len);
     
     //Check datatype compatibility between args and params
@@ -197,6 +194,22 @@ ASTPtr Parser::parse_function_call(const std::string& func_name)
 
     //All set, create node and return
     return create_func_call_node(std::move(func_args), inital_function);
+}
+
+ASTPtr Parser::parse_builtin_function_call(const std::string& func_name)
+{
+    auto&&   function  = builtinMap.at(func_name);
+    bool     has_vargs = std::get<1>(function) == UINT64_MAX;
+    FuncArgs func_args = parse_list(TOKEN_LPAREN, TOKEN_RPAREN);
+    
+    std::size_t args_len = func_args.size(), params_len = std::get<1>(function);
+
+    //Same as parse_function_call
+    if(!has_vargs && args_len != params_len)
+        printError("ParserError", "Function '", func_name, "' expected ", params_len, " arguments but got ", args_len);
+    
+    //Simply return builtin_node
+    return create_builtin_func_call_node(std::get<0>(function), std::get<2>(function), std::move(func_args), has_vargs);
 }
 
 ASTPtr Parser::parse_if_condition()
@@ -413,7 +426,9 @@ ASTPtr Parser::parse_block(bool is_func)
             if(return_stmt->return_expr->getTag() == ASTTag::FunctionCall) {
                 const auto func_call = static_cast<ASTFunctionCall*>(return_stmt->return_expr.get());
                 //Set tailcall to true only if its recursion, vargs does not support TCO for now
-                func_call->isTailCall = (func_call->initial_func->function_body == nullptr) && (!func_call->initial_func->has_vargs);
+                func_call->is_tail_call = (func_call->initial_func->function_body == nullptr)
+                                          &&
+                                          (func_call->initial_func->vargs_type == EVAL_UNKNOWN);
             }
         }
         
@@ -694,16 +709,21 @@ ASTPtr Parser::parse_statement()
             if(match_types(TOKEN_SEMIC))
             {
                 if(current_return_type != EVAL_VOID && current_return_type != EVAL_AUTO)
-                    printError("ParserError", "Function return type is not void, but 'Return;' found");
+                    printError("ParserError", "Function return type is not 'Void' or 'Auto', but 'Return;' found");
                 
                 function_return_value = create_return_node(nullptr);
             }
             else //Expression should exist after 'return' keyword
             {
                 auto return_expr = parse_expr();
+                auto return_type = return_expr->evaluateExprType();
+
+                //We cannot allow 'Void' return type
+                if(return_type == EVAL_VOID)
+                    printError("ParserError", "Return expression cannot be 'Void' type");
 
                 //See if this expression overall type is same as function return type
-                if(return_expr->evaluateExprType() != current_return_type && current_return_type != EVAL_AUTO)
+                if(return_type != current_return_type && current_return_type != EVAL_AUTO)
                     printError("ParserError", "Return type does not match the function's declared return type");
 
                 function_return_value = create_return_node(std::move(return_expr));
@@ -848,18 +868,24 @@ ASTPtr Parser::parse_call()
     //If it's '(' then the atom must be a callable object, otherwise we throw error
     if(match_types(TOKEN_LPAREN))
     {
-        if(!atom->isCallable())
-            printError("ParserError", "Type must be callable, current type doesn't support function call");
+        bool callable = atom->isCallable();
+        if(!callable)
+            printError("ParserError", "Type must be callable, current type cannot be called");
+
+        auto&& id = static_cast<const ASTVariableAccess&>(*atom);
         
+        if(id.evaluateExprType() == EVAL_BUILTIN)
+            return parse_builtin_function_call(id.identifier);
+
         //Valid function call
-        return parse_function_call(static_cast<const ASTVariableAccess&>(*atom).identifier);
+        return parse_function_call(id.identifier);
     }
 
     //Else just return the atom
     return atom;
 }
 
-//Primitive elements: INT, FLOAT, (), Cast<>() etc
+//Primitive elements: ID, INT, FLOAT, (), Cast<>() etc
 ASTPtr Parser::parse_atom()
 {
     switch (current_token.token_type)
@@ -868,13 +894,16 @@ ASTPtr Parser::parse_atom()
         case TOKEN_ID:
         {
             auto&&[type, scope_index] = get_type_from_symbol_table(current_token.token_value);
-            if(type == EVAL_UNKNOWN)
-                printError("ParserError", "Invalid identifier '", current_token.token_value, '\'');
-            
-            //We need the proper string value
-            auto expr = create_variable_access_node(type, current_token.token_value, scope_index);
-            advance();
-            return expr;
+            bool  isBuiltinType       = builtinMap.find(current_token.token_value) != builtinMap.end();
+
+            if(type != EVAL_UNKNOWN || (isBuiltinType))
+            {
+                //We need the proper string value
+                auto expr = create_variable_access_node(isBuiltinType ? EVAL_BUILTIN : type, current_token.token_value, scope_index);
+                advance();
+                return expr;
+            }
+            printError("ParserError", "Invalid identifier '", current_token.token_value, '\'');
         }
         //Values
         case TOKEN_INT:
@@ -973,14 +1002,19 @@ ASTPtr Parser::create_while_node(ASTPtr&& while_condition, ASTPtr&& while_body)
 }
 
 ASTPtr Parser::create_func_decl_node(EvalType return_type, const std::string& func_name,
-                                    FuncParams&& func_params, ASTPtr&& func_body, bool has_vargs, EvalType vargs_type)
+                                    FuncParams&& func_params, ASTPtr&& func_body, EvalType vargs_type)
 {
-    return std::make_unique<ASTFunctionDecl>(return_type, func_name, std::move(func_params), std::move(func_body), has_vargs, vargs_type);
+    return std::make_unique<ASTFunctionDecl>(return_type, func_name, std::move(func_params), std::move(func_body), vargs_type);
 }
 
 ASTPtr Parser::create_func_call_node(FuncArgs&& func_args, ASTFunctionDecl* initial_func)
 {
     return std::make_unique<ASTFunctionCall>(std::move(func_args), initial_func);
+}
+
+ASTPtr Parser::create_builtin_func_call_node(std::uint8_t call_number, EvalType return_type, FuncArgs&& func_args, bool has_vargs)
+{
+    return std::make_unique<ASTBuiltinFunctionCall>(call_number, return_type, std::move(func_args), has_vargs);
 }
 
 ASTPtr Parser::create_continue_node(std::uint8_t continue_params, std::uint16_t scopes_to_destroy)

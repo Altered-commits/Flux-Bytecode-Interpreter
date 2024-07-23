@@ -26,17 +26,25 @@ void FileWriter::writeToFile(const ListOfInstruction &commands)
                     outFile.write(reinterpret_cast<const Byte*>(&std::get<std::double_t>(cmd.value)), sizeof(std::double_t));
                     break;
 
-                case ACCESS_VAR:
-                case ASSIGN_VAR:
-                case ASSIGN_VAR_NO_POP:
                 case REASSIGN_VAR:
                 case REASSIGN_VAR_NO_POP:
+                case ACCESS_VAR:
+                {
+                //Write value and scope index to file
+                    writeStringToFile(std::get<std::string>(cmd.value));
+                    //16bit uint value
+                    std::uint16_t params16Bit = cmd.scopeIndexIfNeeded;
+                    outFile.write(reinterpret_cast<Byte*>(&params16Bit), sizeof(std::uint16_t));
+                }
+                break;
+
+                case ASSIGN_VAR:
+                case ASSIGN_VAR_NO_POP:
                 //Same for these
                 case DATAINST_ITER_ID:
                     writeStringToFile(std::get<std::string>(cmd.value));
                     break;
                 
-                case DATAINST_VAR_SCOPE_IDX:
                 //Same logic for these instructions as well
                 case DESTROY_MULTIPLE_SYMBOL_TABLES:
                 {
@@ -46,6 +54,8 @@ void FileWriter::writeToFile(const ListOfInstruction &commands)
                 }
                 break;
                 case ITER_INIT:
+                case FUNC_END:
+                case BUILTIN_CALL:
                 {
                     //Difference being, this uses .value instead of .scopeIndexIfNeeded
                     std::uint16_t params16Bit = std::get<std::uint16_t>(cmd.value);

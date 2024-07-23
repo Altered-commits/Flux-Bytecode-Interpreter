@@ -206,13 +206,13 @@ void ByteCodeInterpreter::handleReturn(std::size_t returnParams)
     globalInstructionIndex = returnIndex - 1;
 }
 
-void ByteCodeInterpreter::handleFunctionEnd()
+void ByteCodeInterpreter::handleFunctionEnd(std::uint16_t vargsType)
 {
     //Destroy function scope and set globalInstructionIndex to what it was before function call
     destroyFunctionScope();
     
     //If we use vargs, clean up them as well till return address
-    if(!functionStartingStack.empty())
+    if(vargsType != EVAL_UNKNOWN)
     {
         globalStack.resize(functionStartingStack.back());
         functionStartingStack.pop_back();
@@ -280,7 +280,7 @@ void ByteCodeInterpreter::decodeFile()
             case FUNC_END:
             {
                 //Emplace FUNC_END instruction before creating a function frame
-                refToInstructionList->emplace_back(ILInstruction::FUNC_END);
+                refToInstructionList->emplace_back(ILInstruction::FUNC_END, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
 
                 //Create the frame now
                 std::size_t funcStartIndex = functionStack.back().first;
@@ -306,17 +306,15 @@ void ByteCodeInterpreter::decodeFile()
             case ILInstruction::ASSIGN_VAR_NO_POP:
                 refToInstructionList->emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)), 0);
                 break;
-            //But for these instruction, these will be followed by a DATAINST_VAR_SCOPE_IDX instruction containing the index
+
             case ILInstruction::REASSIGN_VAR:
             case ILInstruction::REASSIGN_VAR_NO_POP:
             case ILInstruction::ACCESS_VAR:
-                refToInstructionList->emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)),
-                                        (*refToInstructionList)[refToInstructionList->size() - 1].scopeIndexIfNeeded);
+                refToInstructionList->emplace_back(inst, std::move(readStringOperand(chunkBuffer, chunkBufferIndex)));
+                //Having to do it like this cuz it wasnt working when i do it inline with emplace_back
+                refToInstructionList->back().scopeIndexIfNeeded = readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex);
                 break;
-            case ILInstruction::DATAINST_VAR_SCOPE_IDX:
-                refToInstructionList->emplace_back(inst, 0, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
-                break;
-            
+
             //Jump cases
             case ILInstruction::JUMP:
             case ILInstruction::JUMP_IF_FALSE:
@@ -336,6 +334,7 @@ void ByteCodeInterpreter::decodeFile()
             case ILInstruction::ITER_INIT:
             //Same for this instruction
             case ILInstruction::DESTROY_MULTIPLE_SYMBOL_TABLES:
+            case ILInstruction::BUILTIN_CALL:
                 refToInstructionList->emplace_back(inst, readOperand<std::uint16_t>(chunkBuffer, chunkBufferIndex));
                 break;
             //Rest of it just read instruction
@@ -469,8 +468,13 @@ void ByteCodeInterpreter::interpretInstructions(ListOfInstruction& externalInstr
                 OUT_FUNC
             }
             break;
+            //Fancy ahh
+            case ILInstruction::BUILTIN_CALL:
+                //Call the function at the index specified by call
+                builtinTable.at(static_cast<BuiltinType>(std::get<std::uint16_t>(i.value)))();
+                break;
             case ILInstruction::FUNC_END:
-                handleFunctionEnd();
+                handleFunctionEnd(std::get<std::uint16_t>(i.value));
                 return;
             //Place the value in returnRegister
             case RETURN:

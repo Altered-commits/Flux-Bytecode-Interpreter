@@ -13,13 +13,13 @@
 #include "..\Common\common.hpp" //Common between Interpreter and Compiler
 #include "common.hpp" //Common for files in Compiler only
 
-//Force generate these instructions (strictly to be used in ILGenerator member functions)
-#define INC_CURRENT_OFFSET     ++currentScopeOffset.back();
-#define INCN_CURRENT_OFFSET(N) currentScopeOffset.back() += N;
-#define GET_CURRENT_OFFSET     currentScopeOffset.back()
-#define NEW_OFFSET_SCOPE       currentScopeOffset.emplace_back(0);
-#define DELETE_OFFSET_SCOPE    currentScopeOffset.pop_back();
+#define INC_CURRENT_OFFSET     ++current_scope_offset.back();
+#define INCN_CURRENT_OFFSET(N) current_scope_offset.back() += N;
+#define GET_CURRENT_OFFSET     current_scope_offset.back()
+#define NEW_OFFSET_SCOPE       current_scope_offset.emplace_back(0);
+#define DELETE_OFFSET_SCOPE    current_scope_offset.pop_back();
 
+//Force generate these instructions (strictly to be used in ILGenerator member functions)
 #define SCOPE_START std::cout << "CREATE_SCOPE\n";\
                     il_code.emplace_back(ILInstruction::CREATE_SYMBOL_TABLE);\
                     INC_CURRENT_OFFSET
@@ -61,6 +61,7 @@ class ILGenerator : public ASTVisitorInterface {
         void visit(ASTWhileNode&, bool);
         void visit(ASTFunctionDecl& node, bool);
         void visit(ASTFunctionCall& node, bool);
+        void visit(ASTBuiltinFunctionCall& node, bool);
         void visit(ASTContinue&, bool);
         void visit(ASTBreak&, bool);
         void visit(ASTReturn& node, bool);
@@ -79,13 +80,9 @@ class ILGenerator : public ASTVisitorInterface {
     //Return addrs (function nesting exists so yeah)
         std::vector<ListOfSizeT> return_addr;
         
-        ListOfSizeT currentScopeOffset = {0};
-
-        ListOfASTPtr            ast_statements;
-        ListOfInstruction       il_code;
-    
-    private: //FileWriter
-
+        ListOfSizeT       current_scope_offset = {0};
+        ListOfASTPtr      ast_statements;
+        ListOfInstruction il_code;
 };
 
 #endif

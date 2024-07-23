@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <cstring>
 #include <variant>
+#include <tuple>
+#include <unordered_map>
 #include <vector>
 
 //----------------------EVALUATED TYPES----------------------
@@ -20,8 +22,9 @@ enum EvalType : std::uint8_t
     EVAL_RANGE_ITER,
     EVAL_ELLIPSIS_ITER,
 
-    //Callable type: Function
+    //Callable type: Function or Builtin function
     EVAL_CALLABLE,
+    EVAL_BUILTIN,
 
     //For unknown types
     EVAL_UNKNOWN
@@ -56,7 +59,6 @@ enum ILInstruction : std::uint8_t
     REASSIGN_VAR,
     REASSIGN_VAR_NO_POP,
     ACCESS_VAR,
-    DATAINST_VAR_SCOPE_IDX,
     //Casting instruction
     CAST_INT,
     CAST_FLOAT,
@@ -90,11 +92,19 @@ enum ILInstruction : std::uint8_t
     FUNC_START,
     FUNC_VARGS,
     FUNC_CALL,
+    BUILTIN_CALL,
     FUNC_END,
     RETURN,
     USE_RETURN_VAL,
     //EOF
     END_OF_FILE
+};
+
+//----------------------BUILTINS TYPES----------------------
+enum BuiltinType : std::uint8_t
+{
+    BUILTIN_WRITE_CONSOLE,
+    BUILTIN_IREAD_CONSOLE
 };
 
 //----------------------INSTRUCTION----------------------
@@ -125,9 +135,8 @@ static bool checkFileExt(const char* const EXT, const char* filename)
     return true;
 }
 
-//PURELY FOR DEBUGGING PURPOSES
+//----------PURELY FOR DEBUGGING PURPOSES----------
 static const char* const ILInstructionToString(ILInstruction inst) {
-    // Static array for fast conversion
     static constexpr const char* const ILInstructionStrings[] = {
         "PUSH_INT64",
         "PUSH_UINT64",
@@ -144,7 +153,6 @@ static const char* const ILInstructionToString(ILInstruction inst) {
         "REASSIGN_VAR",
         "REASSIGN_VAR_NO_POP",
         "ACCESS_VAR",
-        "DATAINST_VAR_SCOPE_IDX",
         "CAST_INT",
         "CAST_FLOAT",
         "CMP_EQ",
@@ -171,6 +179,7 @@ static const char* const ILInstructionToString(ILInstruction inst) {
         "FUNC_START",
         "FUNC_VARGS",
         "FUNC_CALL",
+        "BUILTIN_CALL",
         "FUNC_END",
         "RETURN",
         "USE_RETURN_VAL",

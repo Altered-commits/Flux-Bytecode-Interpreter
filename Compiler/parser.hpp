@@ -36,10 +36,7 @@ class Parser
     public:
         Parser(const std::string& text) 
             : lex(text), current_token(lex.get_token())
-        {
-            //Initialize stack with first layer -> global symbol table
-            temporary_symbol_table.emplace_back();
-        }
+        {}
 
         ListOfASTPtr& parse();
         
@@ -62,6 +59,7 @@ class Parser
     private:
         ASTPtr parse_function_decl();
         ASTPtr parse_function_call(const std::string&);
+        ASTPtr parse_builtin_function_call(const std::string&);
         ASTPtr parse_if_condition();
         ASTPtr parse_for_loop();
         ASTPtr parse_while_loop();
@@ -90,8 +88,9 @@ class Parser
         ASTPtr create_ellipsis_iter_node(EvalType, const std::string&);
         ASTPtr create_for_node(const std::string&, ASTPtr&&, ASTPtr&&);
         ASTPtr create_while_node(ASTPtr&&, ASTPtr&&);
-        ASTPtr create_func_decl_node(EvalType, const std::string&, FuncParams&&, ASTPtr&&, bool, EvalType);
+        ASTPtr create_func_decl_node(EvalType, const std::string&, FuncParams&&, ASTPtr&&, EvalType);
         ASTPtr create_func_call_node(FuncArgs&&, ASTFunctionDecl*);
+        ASTPtr create_builtin_func_call_node(std::uint8_t, EvalType, FuncArgs&&, bool);
         ASTPtr create_continue_node(std::uint8_t, std::uint16_t);
         ASTPtr create_break_node(std::uint8_t, std::uint16_t);
         ASTPtr create_return_node(ASTPtr&&);
@@ -127,17 +126,23 @@ class Parser
 
         //Maybe the real statements were the friends we parsed along the way
         ListOfASTPtr statements;
-        //Temporary symbol table for variables, stack based scoping mechanism
-        SymbolTable  temporary_symbol_table;
+        //Temporary symbol table for variables, stack based scoping mechanism, initialize it with global table
+        SymbolTable  temporary_symbol_table = {{}};
 
         //Token type to Eval type converter
         const std::unordered_map<TokenType, EvalType> token_to_eval_type = {
-            {TOKEN_KEYWORD_AUTO,   EVAL_AUTO},
+            {TOKEN_KEYWORD_AUTO,  EVAL_AUTO},
             {TOKEN_KEYWORD_VOID,  EVAL_VOID},
             {TOKEN_INT,           EVAL_INT},
             {TOKEN_KEYWORD_INT,   EVAL_INT},
             {TOKEN_FLOAT,         EVAL_FLOAT},
             {TOKEN_KEYWORD_FLOAT, EVAL_FLOAT}
+        };
+
+        //Maps builtin types to their call number, number of arguments they take (uint64 max meaning they take vargs) and return type
+        const std::unordered_map<std::string, std::tuple<std::uint8_t, std::size_t, EvalType>> builtinMap = {
+            {"__VMInternals_WriteToConsole__",     std::make_tuple(BUILTIN_WRITE_CONSOLE, UINT64_MAX, EVAL_VOID)},
+            {"__VMInternals_ReadIntFromConsole__", std::make_tuple(BUILTIN_IREAD_CONSOLE, 0,          EVAL_INT )}
         };
 };
 
