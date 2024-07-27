@@ -141,8 +141,14 @@ class Parser
 
         //Maps builtin types to their call number, number of arguments they take (uint64 max meaning they take vargs) and return type
         const std::unordered_map<std::string, std::tuple<std::uint8_t, std::size_t, EvalType>> builtinMap = {
-            {"__VMInternals_WriteToConsole__",     std::make_tuple(BUILTIN_WRITE_CONSOLE, UINT64_MAX, EVAL_VOID)},
-            {"__VMInternals_ReadIntFromConsole__", std::make_tuple(BUILTIN_IREAD_CONSOLE, 0,          EVAL_INT )}
+            //IO
+            {"__VMInternals_WriteToConsole__",     std::make_tuple(BUILTIN_WRITE_CONSOLE, UINT64_MAX, EVAL_VOID )},
+            {"__VMInternals_ReadIntFromConsole__", std::make_tuple(BUILTIN_IREAD_CONSOLE, 0,          EVAL_INT  )},
+            //MATH
+            {"__VMInternals_Sqrt__",               std::make_tuple(BUILTIN_SQRT,          1,          EVAL_FLOAT)},
+            {"__VMInternals_Gamma__",              std::make_tuple(BUILTIN_GAMMA,         1,          EVAL_FLOAT)},
+            //TIME
+            {"__VMInternals_GetCurrentTime__",     std::make_tuple(BUILTIN_GETTIME,       0,          EVAL_INT)},
         };
 };
 

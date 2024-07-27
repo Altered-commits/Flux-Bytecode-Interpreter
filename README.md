@@ -6,12 +6,13 @@ Flux is a custom-built bytecode interpreter currently under development. This pr
 ## Supported Features
  - Preprocessor capable of preprocessing `include` and `define` directive without '#' symbol.
  - Compiler capable of:
+   - Primitive types such as integers and floats.
    - Comparision, Logical and Arithmetic expressions.
    - Variable assignments and re-assignments.
    - If-Elif-Else conditions.
    - For loop (Iterator based).
    - While loop (Condition based).
-   - Functions (Without variadic arguments).
+   - Functions (user defined and built-in, variadic arguments supported).
  - Decently fast Bytecode Interpreter.
 
 ## Usage

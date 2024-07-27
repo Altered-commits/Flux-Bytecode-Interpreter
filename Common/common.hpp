@@ -103,8 +103,14 @@ enum ILInstruction : std::uint8_t
 //----------------------BUILTINS TYPES----------------------
 enum BuiltinType : std::uint8_t
 {
+    //IO FUNCTIONS
     BUILTIN_WRITE_CONSOLE,
-    BUILTIN_IREAD_CONSOLE
+    BUILTIN_IREAD_CONSOLE,
+    //MATH FUNCTIONS
+    BUILTIN_SQRT,
+    BUILTIN_GAMMA,
+    //TIME
+    BUILTIN_GETTIME
 };
 
 //----------------------INSTRUCTION----------------------

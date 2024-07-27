@@ -15,26 +15,15 @@ define M_2_SQRTPI 1.1283791670955126
 define M_SQRT2    1.4142135623730951
 define M_SQRT1_2  0.7071067811865476
 
-//Testing functions for making standard library
-Func<Int> Pow(Int base, Int power)
-{
-    Return base ^ power;
-}
+//Builtin Math functions
+/*
+ * Arguments  : 1
+ * Return Type: Float
+*/
+define Sqrt __VMInternals_Sqrt__
 
-Func<Auto> Abs(Auto value)
-{
-    Return value < 0 ? -value : value;
-}
-
-Func<Auto> GCD(Auto a, Auto b)
-{
-    If (b == 0) {
-        Return a;
-    }
-    Return GCD(b, a % b);
-}
-
-Func<Auto> LCM(Auto a, Auto b)
-{
-    Return (a * b) / GCD(a, b);
-}
+/*
+ * Arguments  : 1
+ * Return Type: Float
+*/
+define Gamma __VMInternals_Gamma__

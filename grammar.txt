@@ -4,12 +4,16 @@
               | 'If' '(' <EXPRESSION> ')' '{' <STATEMENT>* '}' <ELIF_CLAUSES> <ELSE_BLOCK>
               | 'For' <identifier> 'in' <ITERATOR> '{' <STATEMENT>* '}'
               | 'While' '(' <COMP_EXPRESSION> ')' '{' <STATEMENT>* '}'
-              | 'Func' '<' TYPE '>' <identifier> '(' <LIST_EXPR> ')' '{' <STATEMENT>* '}'
+              | 'Func' '<' TYPE '>' <identifier> '(' <PARAMS> ')' '{' <STATEMENT>* '}'
               | 'Continue'
               | 'Break'
               | 'Return'
 
-<LIST_EXPR> ::= [<EXPRESSION> (',' <EXPRESSION>)*]
+<PARAMS> ::= <TYPE> <identifier> (',' <TYPE> <identifier>)* [(',' <TYPE> '...')?]
+
+<TYPE> ::= 'Int'
+         | 'Float'
+         | 'Auto'
 
 <ELIF_CLAUSES> ::= <ELIF_CLAUSE>*
 <ELIF_CLAUSE> ::= 'Elif' '(' <EXPRESSION> ')' '{' <STATEMENT>* '}'
@@ -20,12 +24,12 @@
 
 <RANGE_ITERATOR> ::= <ARITH_EXPRESSION> ('..' | ':') <ARITH_EXPRESSION> (('..' | ':') <ARITH_EXPRESSION>)?
 
-<EXPRESSION> ::= <assignment> (',' <assignment>)*
+<EXPRESSION> ::= <ASSIGNMENT> (',' <ASSIGNMENT>)*
               | <TERNARY_EXPR>
 
 <TERNARY_EXPR> ::= <COMP_EXPRESSION> '?' <EXPRESSION> ':' <EXPRESSION>
 
-<assignment> ::= <identifier> '=' <COMP_EXPRESSION>
+<ASSIGNMENT> ::= <identifier> '=' <COMP_EXPRESSION>
                | <identifier>
 
 <COMP_EXPRESSION> ::= '!' <COMP_EXPRESSION>

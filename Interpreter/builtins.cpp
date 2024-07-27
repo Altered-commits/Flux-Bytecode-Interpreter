@@ -31,3 +31,42 @@ void __VMInternals_ReadIntFromConsole__()
     //Push the value to stack
     globalStack.push_back(val);
 }
+
+void __VMInternals_Sqrt__()
+{
+    //Get the value which we want to sqrt of
+    auto& value = globalStack.back();
+
+    std::visit([&](auto&& arg)
+    {
+        if constexpr(std::is_arithmetic_v<std::decay_t<decltype(arg)>>)
+            globalStack.back() = std::sqrt(arg);
+        else
+            printRuntimeError("BuiltinError -> Sqrt", "'Sqrt' expects argument supporting arithmetic operations");
+            
+    }, value);
+}
+
+void __VMInternals_Gamma__()
+{
+    //Get the value which we want to sqrt of
+    auto& value = globalStack.back();
+
+    std::visit([&](auto&& arg)
+    {
+        if constexpr(std::is_arithmetic_v<std::decay_t<decltype(arg)>>)
+            globalStack.back() = std::tgamma(arg);
+        else
+            printRuntimeError("BuiltinError -> 'Gamma'", "'Gamma' expects argument supporting arithmetic operations");
+            
+    }, value);
+}
+
+void __VMInternals_GetCurrentTime__()
+{
+    auto now    = std::chrono::high_resolution_clock::now();
+    auto nowNS  = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
+    auto epoch  = nowNS.time_since_epoch();
+
+    globalStack.push_back(epoch.count());
+}
